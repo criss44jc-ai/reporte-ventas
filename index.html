@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#F4F6F5;
@@ -22,7 +23,25 @@
     --muted:#64707A;
     --ring-track:#E3E8E6;
     --line:#E5E9E8;
+    --zero-color:#C7CDD1;
   }
+  [data-theme="dark"]{
+    --bg:#0F1620;
+    --surface:#182430;
+    --navy:#B9D4EF;
+    --teal:#3FCDB0;
+    --teal-soft:#12332E;
+    --gold:#E8C158;
+    --silver:#B7C1CA;
+    --bronze:#D68A4C;
+    --coral:#FF8A72;
+    --text:#E7ECF1;
+    --muted:#8A96A3;
+    --ring-track:#26313D;
+    --line:#26313D;
+    --zero-color:#3A4552;
+  }
+  body{transition:background-color .2s, color .2s;}
   *{box-sizing:border-box;}
   body{
     margin:0;
@@ -75,6 +94,281 @@
   #csvFile{display:none;}
   .status-line{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);margin-left:auto;text-align:right;}
   .status-line strong{color:var(--teal);}
+
+  .page-nav{display:flex;gap:8px;margin-bottom:22px;border-bottom:1px solid var(--line);}
+  .page-tab{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+    padding:10px 4px;margin-right:18px;color:var(--muted);cursor:pointer;
+    border-bottom:3px solid transparent;
+  }
+  .page-tab.active{color:var(--navy);border-bottom-color:var(--teal);}
+
+  .monthly-controls{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+  select#monthSelect{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--navy);font-weight:600;
+    border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:#fff;
+  }
+  .mini-note{font-size:11.5px;color:var(--muted);margin-top:16px;line-height:1.6;}
+  .mini-note code{background:var(--teal-soft);padding:1px 5px;border-radius:4px;font-family:'IBM Plex Mono',monospace;}
+
+  table.monthly-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--line);}
+  table.monthly-table th{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted);text-align:right;font-weight:600;padding:10px 12px;background:var(--teal-soft);
+  }
+  table.monthly-table th:first-child{text-align:left;}
+  table.monthly-table td{
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text);
+    text-align:right;padding:8px 12px;border-top:1px solid var(--line);
+  }
+  table.monthly-table td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:600;color:var(--navy);}
+  table.monthly-table tr.today-row td{background:var(--teal-soft);}
+  table.monthly-table tr.total-row td{font-weight:700;color:var(--navy);border-top:2px solid var(--navy);background:#fafcfb;}
+  table.monthly-table td.zero{color:var(--zero-color);}
+
+  .card{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease,background-color .15s ease;}
+  .card:active{background-color:var(--teal-soft);}
+
+  .modal-box{animation:modalIn .25s cubic-bezier(.22,.9,.3,1);}
+  @keyframes modalIn{ from{opacity:0;transform:scale(.94) translateY(8px);} to{opacity:1;transform:scale(1) translateY(0);} }
+
+  @keyframes pointIn{ from{opacity:0;} to{opacity:1;} }
+
+  .chart-tooltip{
+    position:fixed;display:none;pointer-events:none;z-index:2000;
+    background:var(--navy);color:#fff;font-family:'Inter',sans-serif;font-size:12px;
+    padding:8px 11px;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.25);line-height:1.5;
+    max-width:180px;
+  }
+  .chart-tooltip b{font-family:'Space Grotesk',sans-serif;}
+
+  .falling-coin{
+    position:absolute;top:-14px;width:14px;height:14px;border-radius:50%;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);
+    animation-name:coinFall;animation-timing-function:ease-in;animation-fill-mode:forwards;
+    z-index:5;pointer-events:none;
+  }
+  @keyframes coinFall{
+    0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform:translateY(230px) rotate(var(--rot)); opacity:0; }
+  }
+
+  /* ---------- Seguimiento de sucursales (checklist) ---------- */
+  .chk-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;}
+  .chk-datebox{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:10px 18px;text-align:right;font-size:13px;line-height:1.5;}
+  .chk-datebox b{font-size:15px;display:block;font-family:'Space Grotesk',sans-serif;}
+
+  .chk-branch-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+  .chk-branch-btn{flex:1;min-width:150px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;transition:border-color .15s;}
+  .chk-branch-btn:hover{border-color:var(--teal);}
+  .chk-branch-btn.active{border-color:var(--teal);background:var(--teal-soft);}
+  .chk-branch-btn .bname{font-weight:700;font-size:13px;color:var(--navy);font-family:'Space Grotesk',sans-serif;}
+  .chk-branch-btn .bpct{font-size:19px;font-weight:800;margin-top:4px;font-family:'Space Grotesk',sans-serif;}
+  .chk-branch-btn .blabel{font-size:11px;color:var(--muted);}
+
+  .chk-period-row{display:flex;gap:8px;margin-bottom:16px;}
+  .chk-period-btn{padding:9px 20px;border-radius:10px;background:var(--surface);color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;border:2px solid var(--line);}
+  .chk-period-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+
+  .chk-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;}
+  .chk-card h2{margin:0 0 4px;font-size:16px;color:var(--navy);font-family:'Space Grotesk',sans-serif;}
+  .chk-card-sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+
+  .chk-progress-wrap{display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+  .chk-progress-track{flex:1;height:12px;background:var(--ring-track);border-radius:8px;overflow:hidden;}
+  .chk-progress-fill{height:12px;border-radius:8px;background:linear-gradient(90deg,var(--teal) 0%, var(--gold) 100%);transition:width .3s;}
+  .chk-progress-label{font-weight:800;font-size:14px;color:var(--navy);min-width:80px;text-align:right;font-family:'IBM Plex Mono',monospace;}
+
+  .chk-task{display:flex;align-items:flex-start;gap:12px;padding:10px 2px;border-top:1px solid var(--line);}
+  .chk-task:first-child{border-top:none;}
+  .chk-task input[type=checkbox]{width:19px;height:19px;margin-top:1px;flex-shrink:0;accent-color:var(--teal);cursor:pointer;}
+  .chk-task label{font-size:13.5px;line-height:1.4;cursor:pointer;color:var(--text);}
+  .chk-task.done label{color:var(--muted);text-decoration:line-through;}
+  .chk-task .tnum{width:22px;height:22px;border-radius:50%;background:var(--teal-soft);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+  .chk-task.done .tnum{background:var(--teal);color:#fff;}
+
+  #chkNotesArea{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font-size:13px;font-family:'Inter',sans-serif;resize:vertical;min-height:70px;color:var(--text);background:var(--surface);}
+  #chkNotesArea:focus{outline:none;border-color:var(--teal);}
+
+  .chk-history-grid{display:flex;gap:6px;flex-wrap:wrap;}
+  .chk-hcell{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-direction:column;}
+  .chk-hcell .hd{font-size:8px;opacity:.85;}
+  .chk-legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:var(--muted);align-items:center;flex-wrap:wrap;}
+  .chk-legend .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle;}
+
+  .chk-reset-row{display:flex;justify-content:flex-end;margin-top:8px;}
+  .chk-reset-btn{background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline;}
+  .chk-reset-btn:hover{color:var(--coral);}
+
+  .chk-overview-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media (max-width:900px){ .chk-overview-grid{grid-template-columns:repeat(2,1fr);} }
+  .chk-ov-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:transform .2s;}
+  .chk-ov-card:hover{transform:translateY(-2px);}
+  .chk-ov-name{font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;margin-bottom:10px;}
+  .chk-ov-row{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);margin-bottom:6px;}
+  .chk-ov-row b{color:var(--navy);font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
+  .chk-ov-bar{height:7px;background:var(--ring-track);border-radius:5px;overflow:hidden;margin-bottom:10px;}
+  .chk-ov-bar-fill{height:7px;border-radius:5px;}
+
+  .chk-toast{position:fixed;bottom:20px;right:20px;background:var(--navy);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:1500;}
+  .chk-toast.show{opacity:.95;}
+
+  .chk-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media (max-width:820px){ .chk-mini-grid{grid-template-columns:repeat(2,1fr);} }
+  .chk-mini-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;transition:transform .15s;}
+  .chk-mini-card:hover{transform:translateY(-2px);}
+  .chk-mini-name{font-weight:700;font-size:12px;font-family:'Space Grotesk',sans-serif;margin-bottom:8px;}
+  .chk-mini-row{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-bottom:3px;}
+  .chk-mini-row b{color:var(--navy);font-family:'IBM Plex Mono',monospace;}
+
+  .alert-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--line);font-size:12.5px;}
+  .alert-row:first-child{border-top:none;}
+  .alert-row .a-icon{font-size:15px;flex:none;}
+  .alert-row b{color:var(--navy);}
+  .alert-row .a-tag{margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#fff;padding:2px 8px;border-radius:10px;flex:none;}
+
+  .funnel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media (max-width:820px){ .funnel-grid{grid-template-columns:repeat(2,1fr);} }
+  .funnel-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .funnel-card .fname{font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;margin-bottom:10px;}
+  .funnel-stage{margin-bottom:8px;}
+  .funnel-stage .fs-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .funnel-stage .fs-label b{color:var(--navy);font-family:'IBM Plex Mono',monospace;}
+  .funnel-bar-track{height:16px;background:var(--ring-track);border-radius:6px;overflow:hidden;}
+  .funnel-bar-fill{height:16px;border-radius:6px;transition:width .6s ease;}
+  .funnel-conv{font-size:10px;color:var(--muted);text-align:right;margin-top:2px;}
+
+  .theme-toggle{
+    width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);
+    font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;
+  }
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(10,18,28,.6);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+  .modal-box{background:var(--surface);border-radius:16px;padding:28px 26px;max-width:480px;width:100%;max-height:88vh;overflow-y:auto;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.35);}
+  .modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:24px;color:var(--muted);cursor:pointer;line-height:1;}
+  .modal-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+  .modal-avatar{width:64px;height:64px;border-radius:50%;overflow:hidden;flex:none;}
+  .modal-avatar svg{width:100%;height:100%;}
+  .modal-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;color:var(--navy);}
+  .modal-sub{font-size:12.5px;color:var(--muted);}
+  .modal-medal{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-family:'Space Grotesk',sans-serif;margin-left:auto;flex:none;}
+  .modal-medal.r1{background:var(--gold);} .modal-medal.r2{background:var(--silver);} .modal-medal.r3{background:var(--bronze);} .modal-medal.other{background:var(--navy);}
+  .modal-eff-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .modal-ring-wrap{position:relative;width:88px;height:88px;flex:none;}
+  .modal-ring-wrap svg{width:88px;height:88px;transform:rotate(-90deg);}
+  .modal-ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;color:var(--navy);}
+  .modal-stat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .modal-stat .val{font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--navy);font-size:15px;}
+
+  .goal-card{
+    display:flex;flex-wrap:wrap;gap:22px;align-items:center;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:16px 20px;margin-bottom:20px;
+  }
+  .goal-field{display:flex;flex-direction:column;gap:4px;}
+  .goal-field label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;}
+  .goal-field input{
+    font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;color:var(--navy);
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px;width:110px;
+  }
+  .goal-stat{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--navy);}
+  .goal-badge{
+    font-family:'Inter',sans-serif;font-weight:700;font-size:13px;padding:6px 14px;
+    border-radius:20px;color:#fff;
+  }
+  .goal-badge.red{background:var(--coral);}
+  .goal-badge.yellow{background:#D4A017;}
+  .goal-badge.green{background:var(--teal);}
+  .goal-projection{flex:1;min-width:220px;font-size:12.5px;color:var(--muted);line-height:1.5;}
+  .goal-projection strong{color:var(--navy);}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px;}
+  .kpi-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .kpi-card .kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin-bottom:6px;}
+  .kpi-card .kpi-value{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:24px;color:var(--navy);}
+  .kpi-card .kpi-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:4px;}
+
+  .summary-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;margin-bottom:22px;}
+  @media (max-width:820px){ .summary-grid{grid-template-columns:1fr;} }
+  .summary-panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  .summary-panel h3{font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0 0 14px;color:var(--navy);}
+  .mini-rank-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);}
+  .mini-rank-row:first-of-type{border-top:none;}
+  .mini-rank-row .mini-medal{
+    width:22px;height:22px;border-radius:50%;flex:none;color:#fff;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;
+  }
+  .mini-rank-row .mini-name{flex:1;font-size:13px;font-weight:600;color:var(--navy);}
+  .mini-rank-row .mini-sub{font-size:10.5px;color:var(--muted);}
+  .mini-rank-row .mini-val{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text);}
+
+  table.branch-summary{width:100%;border-collapse:collapse;}
+  table.branch-summary th{font-size:9.5px;text-transform:uppercase;color:var(--muted);text-align:right;padding-bottom:6px;font-weight:600;}
+  table.branch-summary th:first-child{text-align:left;}
+  table.branch-summary td{font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;padding:6px 0;border-top:1px solid var(--line);}
+  table.branch-summary td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:600;color:var(--navy);}
+
+  .nav-buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+
+  .panel-banner{background:var(--navy);border-radius:16px;padding:12px 16px;margin-bottom:10px;color:#fff;}
+  .panel-banner h2{font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0 0 6px;font-weight:700;}
+  .panel-banner .trend-chart-wrap{background:rgba(255,255,255,.06);border:none;padding:8px;}
+  .panel-banner .mini-note{color:rgba(255,255,255,.65);}
+  .panel-banner text{fill:rgba(255,255,255,.75) !important;}
+  .panel-banner line{stroke:rgba(255,255,255,.2) !important;}
+  .panel-banner .chart-legend span{color:rgba(255,255,255,.75);}
+
+  .bi-grid{
+    display:grid;gap:10px;margin-bottom:10px;
+    grid-template-columns:1fr 1fr 1fr 1.25fr;
+    grid-template-rows:auto auto;
+    grid-template-areas:
+      "totales porcentual vendedor efect"
+      "cantidad anual anual efect";
+  }
+  @media (max-width:900px){
+    .bi-grid{grid-template-columns:1fr;grid-template-areas:"totales" "cantidad" "porcentual" "vendedor" "anual" "efect";}
+  }
+  .bi-panel{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;
+    opacity:0;transform:translateY(14px);animation:panelIn .5s cubic-bezier(.22,.9,.3,1) forwards;
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .bi-panel:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(22,50,79,.08);}
+  .panel-banner{opacity:0;transform:translateY(14px);animation:panelIn .5s cubic-bezier(.22,.9,.3,1) forwards;}
+  @keyframes panelIn{ to{opacity:1;transform:translateY(0);} }
+  .bi-panel h4{font-family:'Space Grotesk',sans-serif;font-size:12px;margin:0 0 10px;color:var(--navy);text-transform:uppercase;letter-spacing:.03em;}
+  .area-totales{grid-area:totales;} .area-cantidad{grid-area:cantidad;}
+  .area-porcentual{grid-area:porcentual;} .area-vendedor{grid-area:vendedor;}
+  .area-efect{grid-area:efect;display:flex;flex-direction:column;}
+  .area-anual{grid-area:anual;}
+
+  .big-list-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:4px 0;font-family:'Inter',sans-serif;}
+  .big-list-row b{color:var(--navy);font-family:'IBM Plex Mono',monospace;}
+  .big-number{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:var(--navy);text-align:right;margin-top:8px;}
+
+  .hbar-row{margin-bottom:9px;}
+  .hbar-row .hbar-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .hbar-track{height:9px;border-radius:5px;background:var(--ring-track);overflow:hidden;}
+  .hbar-fill{height:100%;border-radius:5px;}
+
+  .donut-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;}
+  .donut-legend{display:flex;flex-direction:column;gap:6px;}
+  .donut-legend .row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);}
+  .donut-legend .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .donut-legend b{color:var(--navy);}
+
+  .effectiveness-big{text-align:center;padding:10px 0 18px;}
+  .effectiveness-big .val{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:28px;color:var(--teal);}
+  .effectiveness-big .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+  .mini-donut-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;}
+  .mini-donut-item{text-align:center;}
+  .mini-donut-item .branch-lbl{font-size:11px;font-weight:600;color:var(--navy);margin-top:4px;}
+
+  .chart-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;justify-content:center;}
+  .chart-legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-family:'Inter',sans-serif;}
+  .chart-legend .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .trend-chart-wrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px;}
 
   .branch-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;}
   .view-toggle{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
@@ -182,6 +476,12 @@
     header.top{flex-direction:column;align-items:flex-start;}
     .global-total{text-align:left;}
   }
+
+  @media print{
+    .page-nav, .controls, .nav-buttons, .theme-toggle, .btn, footer.note{display:none !important;}
+    body{background:#fff;}
+    .card, .bi-panel, .chk-card{break-inside:avoid;}
+  }
 </style>
 </head>
 <body>
@@ -197,32 +497,250 @@
       <div class="value" id="globalMesVal">—</div>
       <div class="sub" id="globalMontoVal">—</div>
     </div>
+    <button class="theme-toggle" id="btnExportExcel" title="Descargar Excel">⬇️</button>
+    <button class="theme-toggle" id="btnExportPDF" title="Imprimir / Guardar como PDF">🖨️</button>
+    <button class="theme-toggle" id="themeToggle" title="Cambiar tema">🌙</button>
   </header>
 
-  <div class="controls">
-    <div class="group">
-      <button class="btn" id="btnUpload">Subir CSV del día</button>
-      <input type="file" id="csvFile" accept=".csv">
-      <button class="btn secondary" id="btnTemplate">Descargar plantilla CSV</button>
-    </div>
-    <div class="divider-v"></div>
-    <div class="group">
-      <input type="text" id="sheetUrl" placeholder="URL de CSV público (Google Sheets &gt; Publicar en la web)">
-      <button class="btn secondary" id="btnConnect">Conectar fuente</button>
-      <button class="btn ghost" id="btnStop" style="display:none;">Detener auto-actualización</button>
-    </div>
-    <div class="status-line" id="statusLine">Mostrando datos de ejemplo</div>
+  <div class="page-nav" id="pageNav">
+    <div class="page-tab active" data-page="summary">🏠 Resumen general</div>
+    <div class="page-tab" data-page="seguimiento">✅ Seguimiento de Sucursales</div>
+    <div class="page-tab" data-page="dashboard">📊 Panel de vendedores</div>
+    <div class="page-tab" data-page="monthly">📅 Informe mensual de desembolsos</div>
+    <div class="page-tab" data-page="periods">📈 Metas &amp; periodos</div>
+    <div class="page-tab" data-page="leads">🔍 Leads &amp; Cartera</div>
   </div>
 
-  <div class="view-toggle" id="viewToggle">
-    <div class="chip active" data-mode="basica">Vista básica (por sucursal)</div>
-    <div class="chip" data-mode="monto">🏆 Top por dinero vendido</div>
-    <div class="chip" data-mode="ventas">🏆 Top por cantidad de ventas</div>
+  <div id="pageSummary">
+    <div class="bi-panel" id="biAlertasWrap" style="display:none;margin-bottom:12px;border-color:var(--coral);">
+      <h4 style="color:var(--coral);">⚠️ Alertas — necesitan atención</h4>
+      <div id="biAlertas"></div>
+    </div>
+
+    <div class="bi-panel" style="margin-bottom:12px;">
+      <h4>Seguimiento de Sucursales · Cumplimiento de hoy</h4>
+      <div class="chk-mini-grid" id="biSeguimientoResumen"></div>
+    </div>
+
+    <div class="panel-banner">
+      <h2>Menú de ventas en indicadores</h2>
+      <div id="bannerTrendChart"></div>
+    </div>
+
+    <div class="bi-grid">
+      <div class="bi-panel area-totales"><h4>Ventas Totales</h4><div id="biVentasTotales"></div></div>
+      <div class="bi-panel area-porcentual"><h4>Ventas Porcentual</h4><div id="biVentasPorcentual"></div></div>
+      <div class="bi-panel area-vendedor"><h4>Ventas por Vendedor</h4><div id="biVentasVendedor"></div></div>
+      <div class="bi-panel area-efect"><h4>Efectividad Promedio</h4><div id="biEfectividad"></div></div>
+      <div class="bi-panel area-cantidad"><h4>Ventas Totales · Cantidad</h4><div id="biVentasCantidad"></div></div>
+      <div class="bi-panel area-anual"><h4>Venta Anual · Comportamiento por Sucursal</h4><div id="biVentaAnual"></div></div>
+    </div>
+
+    <div class="bi-panel" style="margin-bottom:22px;">
+      <h4>Ventas por Sucursal · Cantidad Mensual</h4>
+      <div id="biVentasSucursalMes"></div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn secondary" data-goto="dashboard">Ver vendedores en detalle →</button>
+      <button class="btn secondary" data-goto="monthly">Ver informe diario de desembolsos →</button>
+      <button class="btn secondary" data-goto="periods">Ver metas y periodos →</button>
+      <button class="btn secondary" data-goto="seguimiento">Ver seguimiento de sucursales →</button>
+    </div>
   </div>
 
-  <div class="branch-filter" id="branchFilter"></div>
+  <div id="pageDashboard" style="display:none;">
+    <div class="controls">
+      <div class="group">
+        <button class="btn" id="btnUpload">Subir CSV del día</button>
+        <input type="file" id="csvFile" accept=".csv">
+        <button class="btn secondary" id="btnTemplate">Descargar plantilla CSV</button>
+      </div>
+      <div class="divider-v"></div>
+      <div class="group">
+        <input type="text" id="sheetUrl" placeholder="URL de CSV público (Google Sheets &gt; Publicar en la web)">
+        <button class="btn secondary" id="btnConnect">Conectar fuente</button>
+        <button class="btn ghost" id="btnStop" style="display:none;">Detener auto-actualización</button>
+      </div>
+      <div class="status-line" id="statusLine">Mostrando datos de ejemplo</div>
+    </div>
 
-  <div id="branches"></div>
+    <div class="view-toggle" id="viewToggle">
+      <div class="chip active" data-mode="basica">Vista básica (por sucursal)</div>
+      <div class="chip" data-mode="monto">🏆 Top por dinero vendido</div>
+      <div class="chip" data-mode="ventas">🏆 Top por cantidad de ventas</div>
+      <div class="chip" data-mode="mejora">📈 Top mejora % vs mes anterior</div>
+    </div>
+
+    <div class="branch-filter" id="branchFilter"></div>
+
+    <div id="branches"></div>
+  </div>
+
+  <div id="pageMonthly" style="display:none;">
+    <div class="controls">
+      <div class="group">
+        <input type="text" id="disbUrl" placeholder="URL de CSV público de desembolsos (pestaña separada del Sheet)">
+        <button class="btn secondary" id="btnDisbConnect">Conectar fuente</button>
+        <button class="btn ghost" id="btnDisbStop" style="display:none;">Detener auto-actualización</button>
+      </div>
+      <div class="divider-v"></div>
+      <div class="group">
+        <button class="btn secondary" id="btnDisbTemplate">Descargar plantilla CSV</button>
+      </div>
+      <div class="status-line" id="disbStatusLine">Mostrando datos de ejemplo</div>
+    </div>
+
+    <div class="monthly-controls">
+      <select id="monthSelect"></select>
+      <div class="view-toggle" id="disbMetricToggle" style="margin-bottom:0;">
+        <div class="chip active" data-metric="monto">💰 Monto desembolsado</div>
+        <div class="chip" data-metric="cantidad">🔢 Cantidad de préstamos</div>
+      </div>
+    </div>
+
+    <div id="monthlyTableWrap"></div>
+
+    <p class="mini-note">
+      Esta pestaña necesita una hoja separada con una fila por día y sucursal. Columnas esperadas del CSV:
+      <code>fecha,sucursal,monto,cantidad</code> (fecha en formato AAAA-MM-DD, ej. 2026-07-16).
+    </p>
+  </div>
+
+  <div id="pagePeriods" style="display:none;">
+    <div class="view-toggle" id="periodToggle">
+      <div class="chip" data-period="dia">Día</div>
+      <div class="chip active" data-period="semana">Semana</div>
+      <div class="chip" data-period="mes">Mes</div>
+      <div class="chip" data-period="trimestre">Trimestre</div>
+    </div>
+    <div class="view-toggle" id="periodMetricToggle">
+      <div class="chip" data-metric="monto">💰 Monto</div>
+      <div class="chip active" data-metric="cantidad">🔢 Cantidad de préstamos</div>
+    </div>
+
+    <div class="goal-card" id="goalCard"></div>
+
+    <div class="trend-chart-wrap" id="trendChartWrap"></div>
+
+    <div id="periodTableWrap"></div>
+
+    <p class="mini-note">
+      Usa la misma fuente de datos que "Informe mensual de desembolsos" — conéctala ahí si todavía no lo has hecho.
+      La meta se guarda por separado para cada período (día/semana/mes/trimestre) y se compara contra el período más reciente con datos.
+    </p>
+  </div>
+
+  <div id="pageLeads" style="display:none;">
+    <div class="controls">
+      <div class="group">
+        <button class="btn" id="btnLeadsUpload">Subir CSV de leads</button>
+        <input type="file" id="leadsFile" accept=".csv">
+        <button class="btn secondary" id="btnLeadsTemplate">Plantilla leads</button>
+      </div>
+      <div class="divider-v"></div>
+      <div class="group">
+        <input type="text" id="leadsUrl" placeholder="URL de CSV público de leads">
+        <button class="btn secondary" id="btnLeadsConnect">Conectar</button>
+      </div>
+      <div class="status-line" id="leadsStatusLine">Mostrando datos de ejemplo</div>
+    </div>
+
+    <div class="bi-panel" style="margin-bottom:16px;">
+      <h4>Embudo de conversión por sucursal (mes actual)</h4>
+      <div class="funnel-grid" id="funnelGrid"></div>
+    </div>
+
+    <div class="bi-panel" style="margin-bottom:22px;">
+      <h4>Conversión por fuente de lead (todas las sucursales, mes actual)</h4>
+      <div id="fuenteTableWrap"></div>
+    </div>
+
+    <div class="controls">
+      <div class="group">
+        <button class="btn" id="btnMoraUpload">Subir CSV de cartera</button>
+        <input type="file" id="moraFile" accept=".csv">
+        <button class="btn secondary" id="btnMoraTemplate">Plantilla cartera</button>
+      </div>
+      <div class="divider-v"></div>
+      <div class="group">
+        <input type="text" id="moraUrl" placeholder="URL de CSV público de cartera">
+        <button class="btn secondary" id="btnMoraConnect">Conectar</button>
+      </div>
+      <div class="status-line" id="moraStatusLine">Mostrando datos de ejemplo</div>
+    </div>
+
+    <div class="bi-panel" style="margin-bottom:22px;">
+      <h4>Cancelaciones vs. abono a capital (mensual)</h4>
+      <div id="moraChartWrap"></div>
+    </div>
+
+    <p class="mini-note">
+      Leads — columnas del CSV: <code>fecha,sucursal,fuente,leads,contactados,cerrados</code>.
+      Cartera — columnas del CSV: <code>fecha,sucursal,cancelaciones,abono_capital</code> (una fila por mes y sucursal).
+    </p>
+  </div>
+
+  <div id="pageSeguimiento" style="display:none;">
+    <div class="panel-banner chk-header">
+      <div>
+        <h2 style="margin-bottom:4px;">📋 Seguimiento Diario de Sucursales</h2>
+        <div style="font-size:13px;color:rgba(255,255,255,.75);">Control diario, semanal y mensual de desempeño por sucursal</div>
+      </div>
+      <div class="chk-datebox">
+        <b id="chkTodayLabel">—</b>
+        Semana <span id="chkWeekLabel">—</span> · <span id="chkMonthLabel">—</span>
+      </div>
+    </div>
+
+    <div class="chk-branch-row" id="chkBranchRow"></div>
+
+    <div id="chkOverviewSection" style="display:none;">
+      <div class="chk-card">
+        <h2>Resumen de hoy — todas las sucursales</h2>
+        <div class="chk-card-sub">Vista rápida del cumplimiento diario, semanal y mensual por sucursal</div>
+        <div class="chk-overview-grid" id="chkOverviewGrid"></div>
+      </div>
+    </div>
+
+    <div id="chkDetailSection">
+      <div class="chk-period-row" id="chkPeriodRow"></div>
+
+      <div class="chk-card">
+        <h2 id="chkPeriodTitle"></h2>
+        <div class="chk-card-sub" id="chkPeriodSub"></div>
+        <div class="chk-progress-wrap">
+          <div class="chk-progress-track"><div class="chk-progress-fill" id="chkProgressFill" style="width:0%;"></div></div>
+          <div class="chk-progress-label" id="chkProgressLabel">0%</div>
+        </div>
+        <div id="chkTaskList"></div>
+        <div class="chk-reset-row"><button class="chk-reset-btn" id="chkResetBtn">Reiniciar checklist de este periodo</button></div>
+      </div>
+
+      <div class="chk-card">
+        <h2>Notas del día</h2>
+        <div class="chk-card-sub">Observaciones, pendientes o comentarios de la sucursal seleccionada</div>
+        <textarea id="chkNotesArea" placeholder="Escribe aquí observaciones del día..."></textarea>
+      </div>
+
+      <div class="chk-card">
+        <h2>Historial — últimos 14 días</h2>
+        <div class="chk-card-sub">Cumplimiento del checklist diario por sucursal</div>
+        <div class="chk-history-grid" id="chkHistoryGrid"></div>
+        <div class="chk-legend">
+          <span><span class="sw" style="background:#D64545;"></span>0–39%</span>
+          <span><span class="sw" style="background:#E9C46A;"></span>40–79%</span>
+          <span><span class="sw" style="background:var(--teal);"></span>80–100%</span>
+          <span><span class="sw" style="background:var(--ring-track);"></span>Sin datos</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="mini-note">
+      Esta pestaña guarda su propio checklist, notas e historial — independiente de los datos de ventas y desembolsos.
+      Cada persona que abra este panel en su propio navegador ve y guarda su propio avance.
+    </p>
+  </div>
 
   <footer class="note">
     Este panel se actualiza de dos formas: (1) subiendo manualmente un CSV exportado de Excel cada día, o
@@ -231,26 +749,99 @@
   </footer>
 </div>
 
+<div class="modal-overlay" id="vendorModal">
+  <div class="modal-box" id="vendorModalBox"></div>
+</div>
+
+<div class="chart-tooltip" id="chartTooltip"></div>
+
+<div class="chk-toast" id="chkToast">Guardado</div>
+
 <script>
 const BRANCH_ORDER = ["Casa Matriz","Chorrera","La 24 de Diciembre","Chiriquí"];
 const AVATAR_COLORS = ["#1F6F63","#16324F","#B5651D","#6A4C93","#2A6F97","#8A5A44"];
 
 const DEFAULT_DATA = [
- {sucursal:"Casa Matriz",nombre:"Yarlenis Pérez",rol:"Encargada",rank:1,ventas_dia:4,monto_dia:1400,ventas_semana:26,monto_semana:9100,ventas_mes:106,monto_mes:37100,ventas_anio:1180,monto_anio:413000,pct_global:22.6,efectividad:96,puntos:98},
- {sucursal:"Casa Matriz",nombre:"Yelenis Ríos",rol:"Vendedora",rank:3,ventas_dia:2,monto_dia:700,ventas_semana:15,monto_semana:5250,ventas_mes:59,monto_mes:20650,ventas_anio:690,monto_anio:241500,pct_global:12.6,efectividad:82,puntos:95},
- {sucursal:"Chorrera",nombre:"Johel Batista",rol:"Encargado",rank:2,ventas_dia:3,monto_dia:1050,ventas_semana:17,monto_semana:5950,ventas_mes:67,monto_mes:23450,ventas_anio:760,monto_anio:266000,pct_global:14.3,efectividad:88,puntos:97},
- {sucursal:"Chorrera",nombre:"Ivanoe Wong",rol:"Vendedora",rank:2,ventas_dia:3,monto_dia:1050,ventas_semana:17,monto_semana:5950,ventas_mes:67,monto_mes:23450,ventas_anio:760,monto_anio:266000,pct_global:14.3,efectividad:88,puntos:96},
- {sucursal:"La 24 de Diciembre",nombre:"Damaris Gómez",rol:"Encargada",rank:4,ventas_dia:2,monto_dia:700,ventas_semana:12,monto_semana:4200,ventas_mes:46,monto_mes:16100,ventas_anio:520,monto_anio:182000,pct_global:9.8,efectividad:75,puntos:93},
- {sucursal:"La 24 de Diciembre",nombre:"Teofilo Santos",rol:"Vendedor",rank:6,ventas_dia:1,monto_dia:350,ventas_semana:11,monto_semana:3850,ventas_mes:43,monto_mes:15050,ventas_anio:500,monto_anio:175000,pct_global:9.2,efectividad:70,puntos:90},
- {sucursal:"Chiriquí",nombre:"Gerardo Núñez",rol:"Encargado",rank:7,ventas_dia:0,monto_dia:0,ventas_semana:2,monto_semana:700,ventas_mes:7,monto_mes:2450,ventas_anio:90,monto_anio:31500,pct_global:1.5,efectividad:20,puntos:85},
- {sucursal:"Chiriquí",nombre:"Itzel Camarena",rol:"Vendedora",rank:5,ventas_dia:1,monto_dia:350,ventas_semana:11,monto_semana:3850,ventas_mes:43,monto_mes:15050,ventas_anio:480,monto_anio:168000,pct_global:9.2,efectividad:72,puntos:94},
- {sucursal:"Chiriquí",nombre:"Roger Delgado",rol:"Vendedor",rank:8,ventas_dia:1,monto_dia:350,ventas_semana:8,monto_semana:2800,ventas_mes:30,monto_mes:10500,ventas_anio:340,monto_anio:119000,pct_global:6.4,efectividad:55,puntos:88},
+ {sucursal:"Casa Matriz",nombre:"Yarlenis Pérez",rol:"Encargada",rank:1,ventas_dia:4,monto_dia:1400,ventas_semana:26,monto_semana:9100,ventas_mes:106,monto_mes:37100,ventas_anio:1180,monto_anio:413000,pct_global:22.6,efectividad:96,puntos:98,meta_mensual:110,ventas_mes_anterior:95,monto_mes_anterior:33250},
+ {sucursal:"Casa Matriz",nombre:"Yelenis Ríos",rol:"Vendedora",rank:3,ventas_dia:2,monto_dia:700,ventas_semana:15,monto_semana:5250,ventas_mes:59,monto_mes:20650,ventas_anio:690,monto_anio:241500,pct_global:12.6,efectividad:82,puntos:95,meta_mensual:65,ventas_mes_anterior:50,monto_mes_anterior:17500},
+ {sucursal:"Chorrera",nombre:"Johel Batista",rol:"Encargado",rank:2,ventas_dia:3,monto_dia:1050,ventas_semana:17,monto_semana:5950,ventas_mes:67,monto_mes:23450,ventas_anio:760,monto_anio:266000,pct_global:14.3,efectividad:88,puntos:97,meta_mensual:70,ventas_mes_anterior:60,monto_mes_anterior:21000},
+ {sucursal:"Chorrera",nombre:"Ivanoe Wong",rol:"Vendedora",rank:2,ventas_dia:3,monto_dia:1050,ventas_semana:17,monto_semana:5950,ventas_mes:67,monto_mes:23450,ventas_anio:760,monto_anio:266000,pct_global:14.3,efectividad:88,puntos:96,meta_mensual:60,ventas_mes_anterior:58,monto_mes_anterior:20300},
+ {sucursal:"La 24 de Diciembre",nombre:"Damaris Gómez",rol:"Encargada",rank:4,ventas_dia:2,monto_dia:700,ventas_semana:12,monto_semana:4200,ventas_mes:46,monto_mes:16100,ventas_anio:520,monto_anio:182000,pct_global:9.8,efectividad:75,puntos:93,meta_mensual:55,ventas_mes_anterior:50,monto_mes_anterior:17500},
+ {sucursal:"La 24 de Diciembre",nombre:"Teofilo Santos",rol:"Vendedor",rank:6,ventas_dia:1,monto_dia:350,ventas_semana:11,monto_semana:3850,ventas_mes:43,monto_mes:15050,ventas_anio:500,monto_anio:175000,pct_global:9.2,efectividad:70,puntos:90,meta_mensual:50,ventas_mes_anterior:40,monto_mes_anterior:14000},
+ {sucursal:"Chiriquí",nombre:"Gerardo Núñez",rol:"Encargado",rank:7,ventas_dia:0,monto_dia:0,ventas_semana:2,monto_semana:700,ventas_mes:7,monto_mes:2450,ventas_anio:90,monto_anio:31500,pct_global:1.5,efectividad:20,puntos:85,meta_mensual:40,ventas_mes_anterior:15,monto_mes_anterior:5250},
+ {sucursal:"Chiriquí",nombre:"Itzel Camarena",rol:"Vendedora",rank:5,ventas_dia:1,monto_dia:350,ventas_semana:11,monto_semana:3850,ventas_mes:43,monto_mes:15050,ventas_anio:480,monto_anio:168000,pct_global:9.2,efectividad:72,puntos:94,meta_mensual:45,ventas_mes_anterior:35,monto_mes_anterior:12250},
+ {sucursal:"Chiriquí",nombre:"Roger Delgado",rol:"Vendedor",rank:8,ventas_dia:1,monto_dia:350,ventas_semana:8,monto_semana:2800,ventas_mes:30,monto_mes:10500,ventas_anio:340,monto_anio:119000,pct_global:6.4,efectividad:55,puntos:88,meta_mensual:35,ventas_mes_anterior:22,monto_mes_anterior:7700},
 ];
+
+function generateDemoDisbursements(){
+  const now = new Date();
+  const year = now.getFullYear(), curMonth = now.getMonth(); // 0-indexado
+  const base = {"Casa Matriz":6200,"Chorrera":4100,"La 24 de Diciembre":3200,"Chiriquí":1800};
+  const monthFactor = [0.72,0.80,0.88,0.95,1.00,1.05,1.10,1.05,1.00,0.95,1.10,1.22];
+  const rows = [];
+  for(let m=0; m<=curMonth; m++){
+    const daysThisMonth = m===curMonth ? now.getDate() : new Date(year, m+1, 0).getDate();
+    for(let d=1; d<=daysThisMonth; d++){
+      BRANCH_ORDER.forEach(branch=>{
+        const seed = (d*31 + branch.length*7 + m*13) % 17;
+        const monto = Math.max(0, Math.round((base[branch]*monthFactor[m] + seed*180 - (d%5===0?2000:0)) / 10) * 10);
+        const cantidad = Math.max(0, Math.round(monto/350));
+        const fecha = `${year}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        rows.push({fecha, sucursal:branch, monto, cantidad});
+      });
+    }
+  }
+  return rows;
+}
 
 let DATA = [];
 let activeBranch = "TODAS";
 let viewMode = "basica";
 let refreshTimer = null;
+
+let DISBURSEMENTS = [];
+let disbMetric = "monto";
+let disbSelectedMonth = null;
+let disbRefreshTimer = null;
+
+let LEADS = [];
+let MORA = [];
+
+function generateDemoLeads(){
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const fuentes = ["Facebook","Referido","WhatsApp","Walk-in"];
+  const convBase = {"Casa Matriz":0.42,"Chorrera":0.34,"La 24 de Diciembre":0.28,"Chiriquí":0.12};
+  const rows = [];
+  BRANCH_ORDER.forEach(branch=>{
+    fuentes.forEach((fuente,fi)=>{
+      const seed = (branch.length*7 + fi*13) % 11;
+      const leads = 18 + seed*3;
+      const contactados = Math.round(leads * (0.75 + (seed%4)*0.04));
+      const cerrados = Math.round(contactados * convBase[branch]);
+      const fecha = `${year}-${String(month+1).padStart(2,"0")}-01`;
+      rows.push({fecha, sucursal:branch, fuente, leads, contactados, cerrados});
+    });
+  });
+  return rows;
+}
+
+function generateDemoMora(){
+  const now = new Date();
+  const year = now.getFullYear(), curMonth = now.getMonth();
+  const base = {"Casa Matriz":2200,"Chorrera":1500,"La 24 de Diciembre":1100,"Chiriquí":2600};
+  const rows = [];
+  for(let m=0; m<=curMonth; m++){
+    BRANCH_ORDER.forEach((branch,bi)=>{
+      const seed = (m*5 + bi*9) % 13;
+      const cancelaciones = Math.max(0, Math.round(base[branch]*0.4 + seed*60));
+      const abono_capital = Math.round(base[branch]*2.2 + seed*140);
+      const fecha = `${year}-${String(m+1).padStart(2,"0")}-01`;
+      rows.push({fecha, sucursal:branch, cancelaciones, abono_capital});
+    });
+  }
+  return rows;
+}
 
 // Funciona dentro de Claude (window.storage) y también si se hospeda
 // este archivo en cualquier otro sitio (usa localStorage como respaldo).
@@ -273,6 +864,28 @@ async function storeSet(key, value){
 function fmtMoney(n){ return "$" + Number(n).toLocaleString("es-PA",{maximumFractionDigits:0}); }
 function initials(name){ const p = name.trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); }
 function colorFor(name){ let h=0; for(const c of name) h = (h*31 + c.charCodeAt(0)) % AVATAR_COLORS.length; return AVATAR_COLORS[h]; }
+
+function generateAvatarSVG(name){
+  let h = 0; for(const c of name) h = (h*131 + c.charCodeAt(0)) >>> 0;
+  const skinTones = ["#F1C27D","#E0AC69","#C68642","#8D5524","#FFDBAC","#EFCBA6"];
+  const hairColors = ["#2C1B18","#4A2C2A","#71491E","#1C1C1C","#7A5C39"];
+  const skin = skinTones[h % skinTones.length];
+  const hair = hairColors[Math.floor(h/6) % hairColors.length];
+  const style = Math.floor(h/30) % 5;
+  let hairShape = "";
+  if(style===0) hairShape = `<path d="M6 26a22 22 0 0 1 44 0v-4a22 22 0 0 0-44 0z" fill="${hair}"/>`;
+  else if(style===1) hairShape = `<path d="M4 30a24 24 0 0 1 48 0v16h-7v-11a4 4 0 0 0-4-4h-26a4 4 0 0 0-4 4v11h-7z" fill="${hair}"/>`;
+  else if(style===2) hairShape = "";
+  else if(style===3) hairShape = `<circle cx="28" cy="19" r="18" fill="${hair}"/><circle cx="28" cy="25" r="16" fill="${skin}"/>`;
+  else hairShape = `<path d="M4 27a24 24 0 0 1 48 0v3h-9l-2-7-4 7h-18l-4-7-2 7h-9z" fill="${hair}"/>`;
+  return `<svg viewBox="0 0 56 56" width="56" height="56">
+    <circle cx="28" cy="28" r="28" fill="${skin}"/>
+    ${hairShape}
+    <circle cx="20" cy="31" r="2.3" fill="#2b2b2b"/>
+    <circle cx="36" cy="31" r="2.3" fill="#2b2b2b"/>
+    <path d="M18 39q10 7 20 0" stroke="#2b2b2b" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
 function medalClass(rank){ return rank===1?"r1":rank===2?"r2":rank===3?"r3":"other"; }
 
 function render(){
@@ -287,9 +900,21 @@ function render(){
 
   if(viewMode !== "basica"){
     filterEl.innerHTML = "";
-    const metric = viewMode === "monto" ? "monto_mes" : "ventas_mes";
-    const label = viewMode === "monto" ? "Ranking global · dinero vendido este mes" : "Ranking global · préstamos vendidos este mes";
-    const sorted = [...DATA].sort((a,b)=> Number(b[metric]||0) - Number(a[metric]||0));
+    let sorted, label;
+    if(viewMode === "mejora"){
+      label = "Ranking global · mejora % vs mes anterior";
+      sorted = [...DATA].sort((a,b)=>{
+        const ga = growthPct(a), gb = growthPct(b);
+        if(ga===null && gb===null) return 0;
+        if(ga===null) return 1;
+        if(gb===null) return -1;
+        return gb - ga;
+      });
+    } else {
+      const metric = viewMode === "monto" ? "monto_mes" : "ventas_mes";
+      label = viewMode === "monto" ? "Ranking global · dinero vendido este mes" : "Ranking global · préstamos vendidos este mes";
+      sorted = [...DATA].sort((a,b)=> Number(b[metric]||0) - Number(a[metric]||0));
+    }
     const section = document.createElement("section");
     section.className = "branch";
     section.innerHTML = `
@@ -359,7 +984,7 @@ function animateAllCards(){
     // dos rAF para asegurar que el navegador pinte el estado inicial (0) antes de animar
     requestAnimationFrame(()=> requestAnimationFrame(()=>{
       ring.setAttribute("stroke-dasharray", targetDash);
-      bar.style.width = targetWidth;
+      if(targetWidth) bar.style.width = targetWidth;
     }));
 
     card.querySelectorAll(".num-count").forEach(el=> animateNumber(el, Number(el.dataset.target)));
@@ -386,10 +1011,835 @@ function animateNumber(el, target, opts={}){
   requestAnimationFrame(tick);
 }
 
-function ringDasharray(pct){
-  const r = 30, c = 2*Math.PI*r;
+function growthPct(e){
+  if(e.ventas_mes_anterior===null || e.ventas_mes_anterior===undefined || e.ventas_mes_anterior<=0) return null;
+  return ((e.ventas_mes - e.ventas_mes_anterior) / e.ventas_mes_anterior) * 100;
+}
+function ticketPromedio(e){ return e.ventas_mes ? Math.round(e.monto_mes / e.ventas_mes) : 0; }
+
+function ringDasharray(pct, r){
+  r = r || 30;
+  const c = 2*Math.PI*r;
   const p = Math.max(0, Math.min(100, Number(pct)||0));
   return `${(p/100*c).toFixed(1)} ${c.toFixed(1)}`;
+}
+
+document.querySelectorAll("#pageNav .page-tab").forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll("#pageNav .page-tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    const page = tab.dataset.page;
+    document.getElementById("pageSummary").style.display = page === "summary" ? "" : "none";
+    document.getElementById("pageDashboard").style.display = page === "dashboard" ? "" : "none";
+    document.getElementById("pageMonthly").style.display = page === "monthly" ? "" : "none";
+    document.getElementById("pagePeriods").style.display = page === "periods" ? "" : "none";
+    document.getElementById("pageLeads").style.display = page === "leads" ? "" : "none";
+    document.getElementById("pageSeguimiento").style.display = page === "seguimiento" ? "" : "none";
+    if(page === "summary") renderSummary();
+    if(page === "monthly") renderMonthly();
+    if(page === "periods") renderPeriods();
+    if(page === "leads") renderLeadsPage();
+    if(page === "seguimiento"){ chkRenderDates(); chkRenderAll(); }
+  };
+});
+document.querySelectorAll("[data-goto]").forEach(btn=>{
+  btn.onclick = ()=> document.querySelector(`#pageNav .page-tab[data-page="${btn.dataset.goto}"]`).click();
+});
+
+/* ---------- Modal de detalle de vendedor ---------- */
+
+function openVendorModal(e, viewRank){
+  const branchMates = DATA.filter(d=>d.sucursal===e.sucursal);
+  const metricField = viewMode === "ventas" ? "ventas_mes" : "monto_mes";
+  const metricLabel = viewMode === "ventas" ? "cantidad" : "dinero";
+  const rankInBranch = [...branchMates].sort((a,b)=>Number(b[metricField]||0)-Number(a[metricField]||0)).findIndex(d=>d.nombre===e.nombre)+1;
+  const rankGlobal = [...DATA].sort((a,b)=>Number(b[metricField]||0)-Number(a[metricField]||0)).findIndex(d=>d.nombre===e.nombre)+1;
+  const badgeRank = (viewRank>=1) ? viewRank : Number(e.rank);
+  const pct = Math.min(100, Number(e.pct_global)||0);
+  const metaPct = e.meta_mensual ? Math.min(100, Math.round(e.ventas_mes/e.meta_mensual*100)) : 0;
+  const metaColor = metaPct>=95 ? "var(--teal)" : metaPct>=60 ? "#D4A017" : "var(--coral)";
+  const g = growthPct(e);
+  const gTxt = g===null ? "sin dato del mes anterior" : (g>=0?"+":"")+g.toFixed(1)+"% vs mes anterior";
+  const gColor = g===null ? "var(--muted)" : g<0 ? "var(--coral)" : "var(--teal)";
+
+  document.getElementById("vendorModalBox").innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">&times;</button>
+    <div class="modal-header">
+      <div class="modal-avatar" style="background:${colorFor(e.nombre)};display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;">${initials(e.nombre)}</div>
+      <div>
+        <div class="modal-name">${e.nombre}</div>
+        <div class="modal-sub">${e.rol} · ${e.sucursal}</div>
+      </div>
+      <div class="modal-medal ${medalClass(badgeRank)}">${badgeRank}</div>
+    </div>
+    <div class="modal-eff-row">
+      <div class="modal-ring-wrap">
+        <svg viewBox="0 0 100 100">
+          <circle class="ring-track" cx="50" cy="50" r="42"></circle>
+          <circle class="ring-prog" cx="50" cy="50" r="42" stroke-dasharray="0 264" data-target="${ringDasharray(e.efectividad,42)}"></circle>
+        </svg>
+        <div class="modal-ring-label" id="modalEff">0%</div>
+      </div>
+      <div class="modal-stat"><div class="lbl">Puesto en su sucursal (por ${metricLabel})</div><div class="val">#${rankInBranch} de ${branchMates.length}</div></div>
+      <div class="modal-stat"><div class="lbl">Puesto global (por ${metricLabel})</div><div class="val">#${rankGlobal} de ${DATA.length}</div></div>
+      <div class="modal-stat"><div class="lbl">Puntos a favor</div><div class="val" id="modalPuntos">0</div></div>
+    </div>
+
+    <div class="bar-row">
+      <div class="bar-label"><span>Meta individual del mes (${e.ventas_mes}/${e.meta_mensual})</span><b style="color:${metaColor};">${metaPct}%</b></div>
+      <div class="bar-track"><div class="bar-fill" id="mMetaBar" style="width:0%;background:${metaColor};"></div></div>
+    </div>
+    <div class="eff-num" style="margin-bottom:10px;display:flex;justify-content:space-between;">
+      <span>🎯 Ticket promedio: <b style="color:var(--navy);">${fmtMoney(ticketPromedio(e))}</b></span>
+      <span style="color:${gColor};font-weight:600;">${gTxt}</span>
+    </div>
+
+    <table class="metrics" style="font-size:13.5px;">
+      <tr><th style="text-align:left;">Periodo</th><th>Cantidad</th><th>Monto</th></tr>
+      <tr><td>Día</td><td id="mDiaC">0</td><td id="mDiaM">$0</td></tr>
+      <tr><td>Semana</td><td id="mSemC">0</td><td id="mSemM">$0</td></tr>
+      <tr><td>Mes</td><td id="mMesC">0</td><td id="mMesM">$0</td></tr>
+      <tr><td>Año</td><td id="mAnioC">0</td><td id="mAnioM">$0</td></tr>
+    </table>
+    <div class="bar-row" style="margin-top:14px;">
+      <div class="bar-label"><span>% de ventas globales del mes</span><b id="mPct">0%</b></div>
+      <div class="bar-track"><div class="bar-fill" id="mBar" data-target="${pct}%" style="width:0%"></div></div>
+    </div>
+
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);">
+      <div class="lbl" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">📝 Notas del gerente sobre este vendedor</div>
+      <textarea id="modalManagerNotes" placeholder="Ej: hablar sobre objeciones de cierre, reconocer buen desempeño..." style="width:100%;min-height:60px;border:1px solid var(--line);border-radius:8px;padding:9px;font-size:12.5px;font-family:'Inter',sans-serif;resize:vertical;color:var(--text);background:var(--surface);"></textarea>
+    </div>
+
+    <p class="mini-note">Este detalle usa el último snapshot cargado para este vendedor. Para comportamiento diario histórico por sucursal, revisa "Informe mensual de desembolsos".</p>
+  `;
+  document.getElementById("vendorModal").style.display = "flex";
+  document.getElementById("modalCloseBtn").onclick = closeVendorModal;
+
+  const ring = document.querySelector("#vendorModalBox .ring-prog");
+  const bar = document.getElementById("mBar");
+  const metaBar = document.getElementById("mMetaBar");
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    ring.setAttribute("stroke-dasharray", ring.dataset.target);
+    bar.style.width = bar.dataset.target;
+    metaBar.style.width = metaPct + "%";
+  }));
+  animateNumber(document.getElementById("modalEff"), Number(e.efectividad), {suffix:"%"});
+  animateNumber(document.getElementById("modalPuntos"), Number(e.puntos));
+  animateNumber(document.getElementById("mDiaC"), Number(e.ventas_dia));
+  animateNumber(document.getElementById("mDiaM"), Number(e.monto_dia), {money:true});
+  animateNumber(document.getElementById("mSemC"), Number(e.ventas_semana));
+  animateNumber(document.getElementById("mSemM"), Number(e.monto_semana), {money:true});
+  animateNumber(document.getElementById("mMesC"), Number(e.ventas_mes));
+  animateNumber(document.getElementById("mMesM"), Number(e.monto_mes), {money:true});
+  animateNumber(document.getElementById("mAnioC"), Number(e.ventas_anio));
+  animateNumber(document.getElementById("mAnioM"), Number(e.monto_anio), {money:true});
+  animateNumber(document.getElementById("mPct"), pct, {suffix:"%", decimals:1});
+
+  const notesArea = document.getElementById("modalManagerNotes");
+  storeGet(`notas-vendedor:${e.nombre}`).then(res=>{ if(res && res.value) notesArea.value = res.value; }).catch(()=>{});
+  let notesTimer;
+  notesArea.oninput = ()=>{
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(()=> storeSet(`notas-vendedor:${e.nombre}`, notesArea.value).catch(()=>{}), 600);
+  };
+
+  const topRank = (badgeRank>=1 && badgeRank<=3) ? badgeRank : 0;
+  if(topRank){
+    setTimeout(()=> dropCoins(document.getElementById("vendorModalBox"), topRank), 200);
+  }
+}
+
+function closeVendorModal(){ document.getElementById("vendorModal").style.display = "none"; }
+
+document.getElementById("vendorModal").addEventListener("click", (ev)=>{
+  if(ev.target.id === "vendorModal") closeVendorModal();
+});
+document.addEventListener("keydown", (ev)=>{ if(ev.key === "Escape") closeVendorModal(); });
+
+function dropCoins(cardEl, rank){
+  const color = rank===1 ? "#D4A017" : rank===2 ? "#9AA5B1" : "#B5651D";
+  const prevOverflow = cardEl.style.overflow;
+  cardEl.style.overflow = "visible";
+  const width = cardEl.getBoundingClientRect().width;
+  const count = 16;
+  for(let i=0; i<count; i++){
+    const coin = document.createElement("div");
+    coin.className = "falling-coin";
+    const duration = 700 + Math.random()*500;
+    const delay = Math.random()*250;
+    coin.style.left = (Math.random()*width) + "px";
+    coin.style.background = color;
+    coin.style.animationDuration = duration + "ms";
+    coin.style.animationDelay = delay + "ms";
+    coin.style.setProperty("--rot", (Math.random()*360-180) + "deg");
+    cardEl.appendChild(coin);
+    setTimeout(()=> coin.remove(), duration + delay + 60);
+  }
+  setTimeout(()=>{ cardEl.style.overflow = prevOverflow; }, 1450);
+}
+
+document.getElementById("branches").addEventListener("click", (ev)=>{
+  const card = ev.target.closest(".card");
+  if(!card) return;
+  const emp = DATA.find(d=>d.nombre === card.dataset.nombre);
+  if(!emp) return;
+  const rank = Number(card.dataset.rank);
+  if(rank>=1 && rank<=3) dropCoins(card, rank);
+  openVendorModal(emp, rank);
+});
+
+/* ---------- Modo oscuro / claro ---------- */
+
+function applyTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  document.getElementById("themeToggle").textContent = theme === "dark" ? "☀️" : "🌙";
+  localStorage.setItem("theme-pref", theme);
+}
+
+function refreshActivePage(){
+  const active = document.querySelector("#pageNav .page-tab.active");
+  const page = active ? active.dataset.page : "summary";
+  if(page==="summary") renderSummary();
+  if(page==="dashboard") render();
+  if(page==="monthly") renderMonthly();
+  if(page==="periods") renderPeriods();
+}
+
+document.getElementById("themeToggle").onclick = ()=>{
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  applyTheme(isDark ? "light" : "dark");
+  refreshActivePage();
+};
+
+document.getElementById("btnExportPDF").onclick = ()=> window.print();
+
+document.getElementById("btnExportExcel").onclick = ()=>{
+  const wb = XLSX.utils.book_new();
+
+  const vendRows = DATA.map(e=>({
+    Sucursal:e.sucursal, Nombre:e.nombre, Rol:e.rol, Rank:e.rank,
+    Ventas_dia:e.ventas_dia, Monto_dia:e.monto_dia,
+    Ventas_semana:e.ventas_semana, Monto_semana:e.monto_semana,
+    Ventas_mes:e.ventas_mes, Monto_mes:e.monto_mes,
+    Ventas_anio:e.ventas_anio, Monto_anio:e.monto_anio,
+    Pct_global:e.pct_global, Efectividad:e.efectividad, Puntos:e.puntos,
+    Meta_mensual:e.meta_mensual, Ventas_mes_anterior:e.ventas_mes_anterior,
+    Ticket_promedio:ticketPromedio(e), Mejora_pct:growthPct(e)
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendRows), "Vendedores");
+
+  if(DISBURSEMENTS.length){
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(DISBURSEMENTS), "Desembolsos");
+  }
+  if(typeof LEADS !== "undefined" && LEADS.length){
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(LEADS), "Leads");
+  }
+  if(typeof MORA !== "undefined" && MORA.length){
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(MORA), "Mora");
+  }
+
+  XLSX.writeFile(wb, `reporte_autocash_${new Date().toISOString().slice(0,10)}.xlsx`);
+};
+
+function monthKey(fecha){ return String(fecha).slice(0,7); } // "AAAA-MM"
+function daysInMonth(key){ const [y,m] = key.split("-").map(Number); return new Date(y, m, 0).getDate(); }
+function monthLabel(key){
+  const [y,m] = key.split("-").map(Number);
+  const nombres = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  return `${nombres[m-1]} ${y}`;
+}
+
+function renderMonthly(){
+  const months = [...new Set(DISBURSEMENTS.map(r=>monthKey(r.fecha)))].sort().reverse();
+  const monthSelect = document.getElementById("monthSelect");
+  if(!months.length){
+    monthSelect.innerHTML = "<option>Sin datos</option>";
+    document.getElementById("monthlyTableWrap").innerHTML = "<p class='mini-note'>No hay desembolsos cargados todavía.</p>";
+    return;
+  }
+  if(!disbSelectedMonth || !months.includes(disbSelectedMonth)) disbSelectedMonth = months[0];
+  monthSelect.innerHTML = months.map(m=>`<option value="${m}" ${m===disbSelectedMonth?"selected":""}>${monthLabel(m)}</option>`).join("");
+
+  const monthRows = DISBURSEMENTS.filter(r=>monthKey(r.fecha)===disbSelectedMonth);
+  const branches = BRANCH_ORDER.filter(b=>monthRows.some(r=>r.sucursal===b))
+    .concat([...new Set(monthRows.map(r=>r.sucursal))].filter(b=>!BRANCH_ORDER.includes(b)));
+
+  const lookup = {};
+  monthRows.forEach(r=>{
+    const k = r.fecha + "|" + r.sucursal;
+    if(!lookup[k]) lookup[k] = {monto:0, cantidad:0};
+    lookup[k].monto += Number(r.monto)||0;
+    lookup[k].cantidad += Number(r.cantidad)||0;
+  });
+
+  const nDays = daysInMonth(disbSelectedMonth);
+  const todayStr = new Date().toISOString().slice(0,10);
+  const fmt = (v)=> disbMetric==="monto" ? fmtMoney(v) : Number(v).toLocaleString("es-PA");
+
+  let head = `<tr><th>Día</th>${branches.map(b=>`<th>${b}</th>`).join("")}<th>Total</th></tr>`;
+  let bodyRows = "";
+  const colTotals = {}; branches.forEach(b=>colTotals[b]=0); let grandTotal = 0;
+
+  for(let d=1; d<=nDays; d++){
+    const dayStr = `${disbSelectedMonth}-${String(d).padStart(2,"0")}`;
+    let rowTotal = 0;
+    const cells = branches.map(b=>{
+      const v = (lookup[dayStr+"|"+b] || {monto:0,cantidad:0})[disbMetric];
+      colTotals[b] += v; rowTotal += v;
+      return `<td class="${v===0?'zero':''}">${v===0?"—":fmt(v)}</td>`;
+    }).join("");
+    grandTotal += rowTotal;
+    const isToday = dayStr === todayStr ? "today-row" : "";
+    bodyRows += `<tr class="${isToday}"><td>${d}</td>${cells}<td>${fmt(rowTotal)}</td></tr>`;
+  }
+
+  const totalRow = `<tr class="total-row"><td>Total del mes</td>${branches.map(b=>`<td>${fmt(colTotals[b])}</td>`).join("")}<td>${fmt(grandTotal)}</td></tr>`;
+
+  document.getElementById("monthlyTableWrap").innerHTML =
+    `<table class="monthly-table">${head}${bodyRows}${totalRow}</table>`;
+}
+
+document.getElementById("monthSelect").onchange = (ev)=>{ disbSelectedMonth = ev.target.value; renderMonthly(); };
+
+document.querySelectorAll("#disbMetricToggle .chip").forEach(chip=>{
+  chip.onclick = ()=>{
+    disbMetric = chip.dataset.metric;
+    document.querySelectorAll("#disbMetricToggle .chip").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active");
+    renderMonthly();
+  };
+});
+
+function setDisbStatus(text, ok){
+  document.getElementById("disbStatusLine").innerHTML = ok ? "<strong>"+text+"</strong>" : text;
+}
+
+function normalizeDisbRow(r){
+  const num = (v)=> Number(String(v).replace(/[,$\s]/g,"")) || 0;
+  let fecha = String(r.fecha||"").trim();
+  const d = new Date(fecha);
+  if(!isNaN(d) && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)){
+    fecha = d.toISOString().slice(0,10);
+  }
+  return { fecha, sucursal: r.sucursal?.trim(), monto: num(r.monto), cantidad: num(r.cantidad) };
+}
+
+function ingestDisbCsvText(text, sourceLabel){
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  const rows = parsed.data.map(normalizeDisbRow).filter(r=>r.sucursal && r.fecha);
+  if(rows.length){
+    DISBURSEMENTS = rows;
+    disbSelectedMonth = null;
+    storeSet("disbursements-data", JSON.stringify(rows)).catch(()=>{});
+    setDisbStatus(`Actualizado desde ${sourceLabel} · ${new Date().toLocaleTimeString("es-PA")}`, true);
+    renderMonthly();
+    renderSummary();
+  }else{
+    setDisbStatus("El archivo no tiene filas válidas — revisa las columnas", false);
+  }
+}
+
+async function fetchDisbFromUrl(url){
+  try{
+    const res = await fetch(url, {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    ingestDisbCsvText(text, "la fuente conectada");
+  }catch(e){
+    setDisbStatus("No se pudo leer la URL (revisa que el CSV sea público)", false);
+  }
+}
+
+document.getElementById("btnDisbConnect").onclick = async ()=>{
+  const url = document.getElementById("disbUrl").value.trim();
+  if(!url) return;
+  await storeSet("disbursements-source-url", url).catch(()=>{});
+  await fetchDisbFromUrl(url);
+  if(disbRefreshTimer) clearInterval(disbRefreshTimer);
+  disbRefreshTimer = setInterval(()=>fetchDisbFromUrl(url), 5*60*1000);
+  document.getElementById("btnDisbStop").style.display = "inline-block";
+};
+
+document.getElementById("btnDisbStop").onclick = ()=>{
+  if(disbRefreshTimer) clearInterval(disbRefreshTimer);
+  disbRefreshTimer = null;
+  document.getElementById("btnDisbStop").style.display = "none";
+  setDisbStatus("Auto-actualización detenida", false);
+};
+
+document.getElementById("btnDisbTemplate").onclick = ()=>{
+  const headers = "fecha,sucursal,monto,cantidad";
+  const rows = DISBURSEMENTS.map(r => [r.fecha, r.sucursal, r.monto, r.cantidad].join(","));
+  const csv = [headers, ...rows].join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "plantilla_desembolsos.csv";
+  a.click();
+};
+
+/* ---------- Página: Metas & periodos ---------- */
+
+const BRANCH_COLORS_LIGHT = {"Casa Matriz":"#16324F","Chorrera":"#1F6F63","La 24 de Diciembre":"#D4A017","Chiriquí":"#E4572E"};
+const BRANCH_COLORS_DARK  = {"Casa Matriz":"#6FA8DC","Chorrera":"#3FD6BC","La 24 de Diciembre":"#F2C14E","Chiriquí":"#FF8A65"};
+function branchColor(b){
+  const dark = document.documentElement.getAttribute("data-theme")==="dark";
+  const map = dark ? BRANCH_COLORS_DARK : BRANCH_COLORS_LIGHT;
+  return map[b] || colorFor(b);
+}
+
+let periodType = "semana";
+let periodMetric = "cantidad";
+
+function isoWeekInfo(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay()+6)%7; // lunes=0
+  target.setDate(target.getDate()-dayNr+3);
+  const firstThursday = new Date(target.getFullYear(),0,4);
+  const fDayNr = (firstThursday.getDay()+6)%7;
+  firstThursday.setDate(firstThursday.getDate()-fDayNr+3);
+  const week = 1 + Math.round((target-firstThursday)/(7*864e5));
+  return {year:target.getFullYear(), week};
+}
+
+function periodKeyFor(fecha, type){
+  if(type==="dia") return fecha;
+  if(type==="semana"){ const {year,week} = isoWeekInfo(fecha); return `${year}-S${String(week).padStart(2,"0")}`; }
+  if(type==="mes") return fecha.slice(0,7);
+  if(type==="trimestre"){ const [y,m] = fecha.split("-").map(Number); return `${y}-T${Math.ceil(m/3)}`; }
+}
+
+const MES_NOMBRES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+function periodLabel(key, type){
+  if(type==="dia"){ const [y,m,d] = key.split("-").map(Number); return `${d} ${MES_NOMBRES[m-1].slice(0,3)}`; }
+  if(type==="semana"){ const [y,s] = key.split("-S"); return `Sem ${s} · ${y}`; }
+  if(type==="mes"){ const [y,m] = key.split("-").map(Number); return `${MES_NOMBRES[m-1]} ${y}`; }
+  if(type==="trimestre"){ const [y,t] = key.split("-T"); return `T${t} ${y}`; }
+}
+
+function currentPeriodKey(type){ return periodKeyFor(new Date().toISOString().slice(0,10), type); }
+
+function periodEndDate(key, type){
+  if(type==="dia") return new Date(key+"T00:00:00");
+  if(type==="mes"){ const [y,m]=key.split("-").map(Number); return new Date(y,m,0); }
+  if(type==="trimestre"){ const [y,t]=key.split("-T").map(Number); return new Date(y, t*3, 0); }
+  if(type==="semana"){
+    // viernes de esa semana ISO
+    const [y,s] = key.split("-S").map(Number);
+    const jan4 = new Date(y,0,4);
+    const jan4DayNr = (jan4.getDay()+6)%7;
+    const monday = new Date(jan4); monday.setDate(jan4.getDate()-jan4DayNr+(s-1)*7);
+    const friday = new Date(monday); friday.setDate(monday.getDate()+4);
+    return friday;
+  }
+}
+
+function remainingWeekdays(fromDateExclusive, toDate){
+  let n = 0;
+  const d = new Date(fromDateExclusive); d.setDate(d.getDate()+1);
+  while(d <= toDate){
+    const wd = d.getDay();
+    if(wd>=1 && wd<=5) n++;
+    d.setDate(d.getDate()+1);
+  }
+  return n;
+}
+
+function aggregateByPeriod(type){
+  const map = {};
+  DISBURSEMENTS.forEach(r=>{
+    const k = periodKeyFor(r.fecha, type);
+    if(!map[k]) map[k] = {};
+    map[k][r.sucursal] = (map[k][r.sucursal]||0) + Number(r[periodMetric])||0;
+  });
+  return map;
+}
+
+function renderGoalCard(map, branches){
+  const keys = Object.keys(map).sort();
+  const curKey = currentPeriodKey(periodType);
+  const latestWithData = keys.includes(curKey) ? curKey : keys[keys.length-1];
+  const actual = latestWithData ? branches.reduce((s,b)=> s + (map[latestWithData][b]||0), 0) : 0;
+
+  const metaKey = "meta-" + periodType;
+  const saved = localStorage.getItem(metaKey);
+  const meta = saved ? Number(saved) : (periodType==="mes" ? 350 : periodType==="semana" ? 90 : periodType==="trimestre" ? 1000 : 15);
+  const diff = actual - meta;
+  const ratio = meta>0 ? actual/meta : 0;
+  const badgeClass = ratio>=0.95 ? "green" : ratio>=0.6 ? "yellow" : "red";
+  const badgeText = diff>=0 ? `+${diff.toLocaleString("es-PA")} sobre la meta` : `${diff.toLocaleString("es-PA")} bajo la meta`;
+
+  let projection = "";
+  if(latestWithData === curKey){
+    const end = periodEndDate(curKey, periodType);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const remaining = periodType==="dia" ? 0 : remainingWeekdays(today, end);
+    if(diff < 0 && remaining > 0){
+      const perDay = Math.ceil(Math.abs(diff)/remaining);
+      projection = `Faltan <strong>${Math.abs(diff).toLocaleString("es-PA")}</strong> para la meta y quedan <strong>${remaining}</strong> día(s) hábil(es) en este período &rarr; necesitas vender <strong>${perDay}</strong> por día para alcanzarla.`;
+    } else if(diff < 0 && remaining === 0){
+      projection = `El período ya cerró <strong>${Math.abs(diff).toLocaleString("es-PA")}</strong> por debajo de la meta.`;
+    } else {
+      projection = `Vas <strong>${diff.toLocaleString("es-PA")}</strong> por encima de la meta con ${remaining} día(s) hábil(es) restantes — buen ritmo.`;
+    }
+  } else if(latestWithData){
+    projection = `Mostrando el último período con datos (${periodLabel(latestWithData, periodType)}), no el actual.`;
+  } else {
+    projection = "Todavía no hay datos cargados para calcular esto.";
+  }
+
+  const periodNoun = {dia:"diaria",semana:"semanal",mes:"mensual",trimestre:"trimestral"}[periodType];
+
+  document.getElementById("goalCard").innerHTML = `
+    <div class="goal-field">
+      <label>Meta ${periodNoun}</label>
+      <input type="number" id="metaInput" value="${meta}">
+    </div>
+    <div class="goal-field">
+      <label>Actual (${latestWithData?periodLabel(latestWithData,periodType):"—"})</label>
+      <div class="goal-stat">${actual.toLocaleString("es-PA")}</div>
+    </div>
+    <div class="goal-badge ${badgeClass}">${badgeText}</div>
+    <div class="goal-projection">${projection}</div>
+  `;
+  document.getElementById("metaInput").onchange = (ev)=>{
+    localStorage.setItem(metaKey, ev.target.value);
+    renderPeriods();
+  };
+}
+
+function renderTrendChart(map, branches){
+  const keys = Object.keys(map).sort().slice(-12); // últimos 12 periodos
+  const wrap = document.getElementById("trendChartWrap");
+  if(keys.length < 2){ wrap.innerHTML = "<p class='mini-note' style='margin:0;'>Se necesitan al menos 2 períodos con datos para dibujar la tendencia.</p>"; return; }
+
+  function bothMetricsFor(k, b){
+    let monto=0, cantidad=0;
+    DISBURSEMENTS.forEach(r=>{
+      if(r.sucursal===b && periodKeyFor(r.fecha,periodType)===k){ monto+=Number(r.monto)||0; cantidad+=Number(r.cantidad)||0; }
+    });
+    return {monto, cantidad};
+  }
+
+  const W=760,H=230,padL=44,padR=16,padT=20,padB=30;
+  const maxVal = Math.max(1, ...keys.flatMap(k=>branches.map(b=>map[k][b]||0)));
+  const x = i => padL + (keys.length>1 ? i*((W-padL-padR)/(keys.length-1)) : (W-padL-padR)/2);
+  const y = v => H-padB - (v/maxVal)*(H-padT-padB);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%;overflow:visible;"><defs>`;
+  branches.forEach((b,bi)=>{
+    svg += `<linearGradient id="grad${bi}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${branchColor(b)}" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="${branchColor(b)}" stop-opacity="0"/>
+    </linearGradient>`;
+  });
+  svg += `</defs>`;
+
+  for(let g=0; g<=3; g++){
+    const gy = padT + g*((H-padT-padB)/3);
+    svg += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--line)" stroke-dasharray="3 4"/>`;
+  }
+  svg += `<line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)"/>`;
+  keys.forEach((k,i)=>{
+    svg += `<text x="${x(i)}" y="${H-10}" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace" text-anchor="middle">${periodLabel(k,periodType)}</text>`;
+  });
+
+  branches.forEach((b,bi)=>{
+    const pts = keys.map((k,i)=> [x(i), y(map[k][b]||0)]);
+    const linePts = pts.map(p=>p.join(",")).join(" ");
+    const areaPts = `${x(0)},${H-padB} ${linePts} ${x(keys.length-1)},${H-padB}`;
+    svg += `<polygon points="${areaPts}" fill="url(#grad${bi})"></polygon>`;
+    svg += `<polyline class="chart-line" points="${linePts}" fill="none" stroke="${branchColor(b)}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" style="stroke-dasharray:2200;stroke-dashoffset:2200;transition:stroke-dashoffset 1.1s ease;"></polyline>`;
+    pts.forEach(([px,py],i)=>{
+      const {monto,cantidad} = bothMetricsFor(keys[i], b);
+      const tip = `<b style="color:#8FB8E0">${b}</b><br>${periodLabel(keys[i],periodType)}<br>Monto: ${fmtMoney(monto)}<br>Cantidad: ${cantidad.toLocaleString("es-PA")}`;
+      svg += `<circle class="chart-hit" cx="${px}" cy="${py}" r="10" fill="transparent" data-tip="${tip.replace(/"/g,'&quot;')}"></circle>`;
+      svg += `<circle class="chart-point" cx="${px}" cy="${py}" r="4" fill="${branchColor(b)}" stroke="var(--surface)" stroke-width="1.5" style="opacity:0;animation:pointIn .3s ease forwards;animation-delay:${(bi*0.06 + i*0.05).toFixed(2)}s;pointer-events:none;"></circle>`;
+    });
+  });
+  svg += `</svg>`;
+  svg += `<div class="chart-legend">${branches.map(b=>`<span><span class="dot" style="background:${branchColor(b)}"></span>${b}</span>`).join("")}</div>`;
+  wrap.innerHTML = svg;
+
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    wrap.querySelectorAll(".chart-line").forEach(line=> line.style.strokeDashoffset = "0");
+  }));
+}
+
+function showChartTooltip(ev, html){
+  const tip = document.getElementById("chartTooltip");
+  tip.innerHTML = html;
+  tip.style.display = "block";
+  tip.style.left = (ev.clientX + 14) + "px";
+  tip.style.top = (ev.clientY - 12) + "px";
+}
+function hideChartTooltip(){ document.getElementById("chartTooltip").style.display = "none"; }
+
+document.getElementById("trendChartWrap").addEventListener("mousemove", (ev)=>{
+  const pt = ev.target.closest(".chart-hit");
+  if(!pt){ hideChartTooltip(); return; }
+  showChartTooltip(ev, pt.dataset.tip);
+});
+document.getElementById("trendChartWrap").addEventListener("mouseleave", hideChartTooltip);
+
+function renderPeriodTable(map, branches){
+  const keys = Object.keys(map).sort();
+  const curKey = currentPeriodKey(periodType);
+  const fmt = (v)=> periodMetric==="monto" ? fmtMoney(v) : Number(v).toLocaleString("es-PA");
+  const colTotals = {}; branches.forEach(b=>colTotals[b]=0); let grand=0;
+
+  let rows = keys.map(k=>{
+    let rowTotal = 0;
+    const cells = branches.map(b=>{
+      const v = map[k][b]||0; colTotals[b]+=v; rowTotal+=v;
+      return `<td class="${v===0?'zero':''}">${v===0?"—":fmt(v)}</td>`;
+    }).join("");
+    grand += rowTotal;
+    return `<tr class="${k===curKey?'today-row':''}"><td>${periodLabel(k,periodType)}</td>${cells}<td>${fmt(rowTotal)}</td></tr>`;
+  }).join("");
+
+  const head = `<tr><th>${periodType[0].toUpperCase()+periodType.slice(1)}</th>${branches.map(b=>`<th>${b}</th>`).join("")}<th>Total</th></tr>`;
+  const totalRow = `<tr class="total-row"><td>Total general</td>${branches.map(b=>`<td>${fmt(colTotals[b])}</td>`).join("")}<td>${fmt(grand)}</td></tr>`;
+
+  document.getElementById("periodTableWrap").innerHTML = keys.length
+    ? `<table class="monthly-table">${head}${rows}${totalRow}</table>`
+    : "<p class='mini-note'>No hay desembolsos cargados todavía.</p>";
+}
+
+function renderPeriods(){
+  const map = aggregateByPeriod(periodType);
+  const branches = BRANCH_ORDER.filter(b=>DISBURSEMENTS.some(r=>r.sucursal===b))
+    .concat([...new Set(DISBURSEMENTS.map(r=>r.sucursal))].filter(b=>!BRANCH_ORDER.includes(b)));
+  renderGoalCard(map, branches);
+  renderTrendChart(map, branches);
+  renderPeriodTable(map, branches);
+}
+
+document.querySelectorAll("#periodToggle .chip").forEach(chip=>{
+  chip.onclick = ()=>{
+    periodType = chip.dataset.period;
+    document.querySelectorAll("#periodToggle .chip").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active");
+    renderPeriods();
+  };
+});
+document.querySelectorAll("#periodMetricToggle .chip").forEach(chip=>{
+  chip.onclick = ()=>{
+    periodMetric = chip.dataset.metric;
+    document.querySelectorAll("#periodMetricToggle .chip").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active");
+    renderPeriods();
+  };
+});
+
+/* ---------- Página: Resumen general ---------- */
+
+function aggregateByPeriodMetric(type, metric){
+  const map = {};
+  DISBURSEMENTS.forEach(r=>{
+    const k = periodKeyFor(r.fecha, type);
+    if(!map[k]) map[k] = {};
+    map[k][r.sucursal] = (map[k][r.sucursal]||0) + Number(r[metric])||0;
+  });
+  return map;
+}
+
+function buildDonutSVG(segments, size){
+  size = size || 108;
+  const thickness = 16, r = (size-thickness)/2, cx = size/2, cy = size/2, C = 2*Math.PI*r;
+  const total = segments.reduce((s,d)=>s+d.value,0) || 1;
+  let offset = 0, circles = "";
+  segments.forEach(seg=>{
+    const frac = seg.value/total;
+    const dash = `${(frac*C).toFixed(1)} ${C.toFixed(1)}`;
+    circles += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${thickness}" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset*C).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += frac;
+  });
+  const svg = `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${circles}</svg>`;
+  const legend = segments.map(seg=>{
+    const pct = Math.round(seg.value/total*100);
+    return `<div class="row"><span class="dot" style="background:${seg.color}"></span>${seg.label} <b>${pct}%</b></div>`;
+  }).join("");
+  return `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
+}
+
+function buildHBars(items){
+  const max = Math.max(1, ...items.map(i=>i.value));
+  return items.map(i=>`
+    <div class="hbar-row">
+      <div class="hbar-label"><span>${i.label}</span><b style="font-family:'IBM Plex Mono',monospace;color:var(--navy);">${i.value.toLocaleString("es-PA")}</b></div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${(i.value/max*100)}%;background:${i.color}"></div></div>
+    </div>`).join("");
+}
+
+function buildVBarSVG(items, opts){
+  opts = opts || {};
+  const W=260, H=120, padB=24, padT=16;
+  const max = Math.max(1, ...items.map(i=>i.value));
+  const bw = (W-16)/items.length;
+  let bars = "";
+  items.forEach((it,i)=>{
+    const h = (it.value/max)*(H-padB-padT);
+    const x = 8 + i*bw, y = H-padB-h;
+    bars += `<rect x="${x+bw*0.15}" y="${y}" width="${bw*0.7}" height="${h}" fill="${it.color}" rx="2"></rect>`;
+    bars += `<text x="${x+bw/2}" y="${y-4}" font-size="9" text-anchor="middle" fill="var(--navy)" font-family="IBM Plex Mono, monospace">${it.value}</text>`;
+    bars += `<text x="${x+bw/2}" y="${H-8}" font-size="8" text-anchor="middle" fill="var(--muted)" font-family="Inter, sans-serif">${it.label}</text>`;
+  });
+  bars += `<line x1="8" y1="${H-padB}" x2="${W-8}" y2="${H-padB}" stroke="var(--line)"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%;">${bars}</svg>`;
+}
+
+function buildLineSVG(keys, branches, valueFn, labelFn){
+  const W=760,H=150,padL=40,padR=16,padT=14,padB=26;
+  const maxVal = Math.max(1, ...keys.flatMap(k=>branches.map(b=>valueFn(k,b))));
+  const x = i => padL + (keys.length>1 ? i*((W-padL-padR)/(keys.length-1)) : (W-padL-padR)/2);
+  const y = v => H-padB - (v/maxVal)*(H-padT-padB);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%;">`;
+  svg += `<line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)"/>`;
+  keys.forEach((k,i)=> svg += `<text x="${x(i)}" y="${H-8}" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace" text-anchor="middle">${labelFn(k)}</text>`);
+  branches.forEach(b=>{
+    const pts = keys.map((k,i)=> `${x(i)},${y(valueFn(k,b))}`).join(" ");
+    svg += `<polyline points="${pts}" fill="none" stroke="${branchColor(b)}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    keys.forEach((k,i)=> svg += `<circle cx="${x(i)}" cy="${y(valueFn(k,b))}" r="3" fill="${branchColor(b)}"/>`);
+  });
+  svg += `</svg><div class="chart-legend">${branches.map(b=>`<span><span class="dot" style="background:${branchColor(b)}"></span>${b}</span>`).join("")}</div>`;
+  return svg;
+}
+
+function buildGroupedBarSVG(months, branches, valueFn, labelFn){
+  const W=Math.max(760, months.length*90), H=220, padL=10, padR=10, padT=20, padB=30;
+  const maxVal = Math.max(1, ...months.flatMap(m=>branches.map(b=>valueFn(m,b))));
+  const groupW = (W-padL-padR)/months.length;
+  const barW = Math.min(26, (groupW-10)/branches.length);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%;min-width:${W}px;">`;
+  svg += `<line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)"/>`;
+  months.forEach((m,mi)=>{
+    const gx = padL + mi*groupW + (groupW - branches.length*barW)/2;
+    svg += `<text x="${padL+mi*groupW+groupW/2}" y="${H-8}" font-size="9.5" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${labelFn(m)}</text>`;
+    branches.forEach((b,bi)=>{
+      const v = valueFn(m,b);
+      const h = (v/maxVal)*(H-padT-padB);
+      const x = gx + bi*barW, y = H-padB-h;
+      svg += `<rect x="${x}" y="${y}" width="${barW-3}" height="${h}" fill="${branchColor(b)}" rx="2"></rect>`;
+      if(v>0) svg += `<text x="${x+(barW-3)/2}" y="${y-3}" font-size="8" text-anchor="middle" fill="var(--navy)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+    });
+  });
+  svg += `</svg><div class="chart-legend">${branches.map(b=>`<span><span class="dot" style="background:${branchColor(b)}"></span>${b}</span>`).join("")}</div>`;
+  return `<div style="overflow-x:auto;">${svg}</div>`;
+}
+
+function renderSummary(){
+  const branchesVend = BRANCH_ORDER.filter(b=>DATA.some(e=>e.sucursal===b))
+    .concat([...new Set(DATA.map(e=>e.sucursal))].filter(b=>!BRANCH_ORDER.includes(b)));
+  const totalMonto = DATA.reduce((s,e)=>s+Number(e.monto_mes||0),0);
+  const totalVentas = DATA.reduce((s,e)=>s+Number(e.ventas_mes||0),0);
+  const hayAnterior = DATA.some(e=>e.ventas_mes_anterior!==null && e.ventas_mes_anterior!==undefined);
+  const totalMontoAnterior = DATA.reduce((s,e)=>s+Number(e.monto_mes_anterior||0),0);
+  const totalVentasAnterior = DATA.reduce((s,e)=>s+Number(e.ventas_mes_anterior||0),0);
+  const deltaMonto = totalMontoAnterior>0 ? ((totalMonto-totalMontoAnterior)/totalMontoAnterior*100) : null;
+  const deltaVentas = totalVentasAnterior>0 ? ((totalVentas-totalVentasAnterior)/totalVentasAnterior*100) : null;
+  function deltaChip(d){
+    if(d===null) return "";
+    const col = d>=0 ? "var(--teal)" : "var(--coral)";
+    return `<div style="text-align:right;font-size:11px;font-weight:700;color:${col};margin-top:2px;">${d>=0?"▲ +":"▼ "}${d.toFixed(1)}% vs mes pasado</div>`;
+  }
+
+  // Banner: tendencia mensual (reemplazo de "cancelaciones vs abono a capital")
+  const mesMap = aggregateByPeriodMetric("mes", "cantidad");
+  const mesKeys = Object.keys(mesMap).sort();
+  const branchesDisb = [...new Set(DISBURSEMENTS.map(r=>r.sucursal))];
+  const bannerBranches = branchesDisb.length ? branchesDisb : branchesVend;
+  document.getElementById("bannerTrendChart").innerHTML = mesKeys.length>1
+    ? buildLineSVG(mesKeys, bannerBranches, (k,b)=>mesMap[k][b]||0, k=>periodLabel(k,"mes"))
+    : "<p class='mini-note'>Conecta la hoja de desembolsos para ver la tendencia mensual aquí.</p>";
+
+  // Ventas Totales (monto por sucursal + gran total)
+  const totalesRows = branchesVend.map(b=>{
+    const bMonto = DATA.filter(e=>e.sucursal===b).reduce((s,e)=>s+Number(e.monto_mes||0),0);
+    return `<div class="big-list-row"><span>${b.toUpperCase()}</span><b>${fmtMoney(bMonto)}</b></div>`;
+  }).join("");
+  document.getElementById("biVentasTotales").innerHTML = totalesRows + `<div class="big-number">${fmtMoney(totalMonto)}</div>` + deltaChip(deltaMonto);
+
+  // Ventas Totales · Cantidad (barras horizontales + gran total)
+  const cantidadItems = branchesVend.map(b=>({
+    label: b.toUpperCase(),
+    value: DATA.filter(e=>e.sucursal===b).reduce((s,e)=>s+Number(e.ventas_mes||0),0),
+    color: branchColor(b)
+  }));
+  document.getElementById("biVentasCantidad").innerHTML = buildHBars(cantidadItems) + `<div class="big-number">${totalVentas.toLocaleString("es-PA")}</div>` + deltaChip(deltaVentas);
+
+  // Ventas Porcentual (dona por sucursal, según cantidad)
+  document.getElementById("biVentasPorcentual").innerHTML = buildDonutSVG(cantidadItems.map(i=>({label:i.label, value:i.value, color:i.color})));
+
+  // Ventas por Vendedor (barras verticales)
+  const vendorItems = [...DATA].sort((a,b)=>Number(b.ventas_mes||0)-Number(a.ventas_mes||0)).slice(0,8)
+    .map(e=>({label:e.nombre.split(" ")[0], value:Number(e.ventas_mes||0), color:branchColor(e.sucursal)}));
+  document.getElementById("biVentasVendedor").innerHTML = vendorItems.length ? buildVBarSVG(vendorItems) : "<p class='mini-note'>Sin datos.</p>";
+
+  // Efectividad promedio (global + mini-donas por sucursal)
+  const effProm = DATA.length ? Math.round(DATA.reduce((s,e)=>s+Number(e.efectividad||0),0)/DATA.length) : 0;
+  const effDonuts = branchesVend.map(b=>{
+    const emp = DATA.filter(e=>e.sucursal===b);
+    const avg = emp.length ? Math.round(emp.reduce((s,e)=>s+Number(e.efectividad||0),0)/emp.length) : 0;
+    const donut = buildDonutSVG([{label:"Efectividad",value:avg,color:branchColor(b)},{label:"Restante",value:Math.max(0,100-avg),color:"#E3E8E6"}], 68);
+    return `<div class="mini-donut-item">${donut.replace('<div class="donut-legend">','<div class="donut-legend" style="display:none;">')}<div class="branch-lbl">${b}<br>${avg}%</div></div>`;
+  }).join("");
+  document.getElementById("biEfectividad").innerHTML = `
+    <div class="effectiveness-big"><div class="val">${effProm}%</div><div class="lbl">Promedio general</div></div>
+    <div class="mini-donut-grid">${effDonuts}</div>`;
+
+  // Venta Anual · Comportamiento por sucursal (línea mensual, cantidad)
+  document.getElementById("biVentaAnual").innerHTML = mesKeys.length>1
+    ? buildLineSVG(mesKeys, bannerBranches, (k,b)=>mesMap[k][b]||0, k=>periodLabel(k,"mes"))
+    : "<p class='mini-note'>Conecta la hoja de desembolsos para ver esta tendencia.</p>";
+
+  // Ventas por Sucursal · Cantidad Mensual (barras agrupadas)
+  document.getElementById("biVentasSucursalMes").innerHTML = mesKeys.length
+    ? buildGroupedBarSVG(mesKeys, bannerBranches, (k,b)=>mesMap[k][b]||0, k=>periodLabel(k,"mes"))
+    : "<p class='mini-note'>Conecta la hoja de desembolsos para ver este gráfico.</p>";
+
+  document.querySelectorAll("#pageSummary .panel-banner, #pageSummary .bi-panel").forEach((el,i)=>{
+    el.style.animation = "none";
+    void el.offsetHeight;
+    el.style.animation = "";
+    el.style.animationDelay = (i*80) + "ms";
+  });
+
+  renderChecklistSummaryForHome();
+  renderAlerts();
+}
+
+function renderAlerts(){
+  const alerts = [];
+
+  DATA.forEach(e=>{
+    if(e.meta_mensual>0){
+      const pct = e.ventas_mes/e.meta_mensual*100;
+      if(pct < 60){
+        alerts.push({icon:"🔴", tag:"META BAJA", tagColor:"var(--coral)",
+          html:`<b>${e.nombre}</b> (${e.sucursal}) va en <b>${Math.round(pct)}%</b> de su meta individual del mes (${e.ventas_mes}/${e.meta_mensual})`});
+      }
+    }
+    const g = growthPct(e);
+    if(g!==null && g <= -15){
+      alerts.push({icon:"📉", tag:"CAYENDO", tagColor:"#D4A017",
+        html:`<b>${e.nombre}</b> (${e.sucursal}) bajó <b>${Math.abs(g).toFixed(1)}%</b> vs. el mes anterior`});
+    }
+  });
+
+  const wrap = document.getElementById("biAlertasWrap");
+  const list = document.getElementById("biAlertas");
+  if(!alerts.length){ wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  list.innerHTML = alerts.slice(0,8).map(a=>`
+    <div class="alert-row">
+      <span class="a-icon">${a.icon}</span>
+      <span>${a.html}</span>
+      <span class="a-tag" style="background:${a.tagColor};">${a.tag}</span>
+    </div>`).join("");
 }
 
 function cardHtml(e, displayRank, showBranch){
@@ -399,7 +1849,7 @@ function cardHtml(e, displayRank, showBranch){
   const pct = Math.min(100, Number(e.pct_global)||0);
   const topClass = displayRank===1?"top1":displayRank===2?"top2":displayRank===3?"top3":"";
   return `
-  <div class="card ${topClass}">
+  <div class="card ${topClass}" data-nombre="${e.nombre.replace(/"/g,'&quot;')}" data-rank="${displayRank}">
     <div class="card-top">
       <div class="ring-wrap">
         <svg viewBox="0 0 72 72">
@@ -425,10 +1875,23 @@ function cardHtml(e, displayRank, showBranch){
       <tr><td>Año</td><td class="num-count" data-target="${e.ventas_anio}">0</td><td class="num-money" data-target="${e.monto_anio}">$0</td></tr>
     </table>
 
+    <div class="eff-num" style="margin-bottom:8px;">🎯 Ticket promedio: <b style="color:var(--navy);">${fmtMoney(ticketPromedio(e))}</b></div>
+
+    ${viewMode === "mejora" ? (()=>{
+      const g = growthPct(e);
+      const shown = g===null ? 0 : Math.max(-100, Math.min(100, g));
+      const barW = g===null ? 0 : Math.min(100, Math.abs(shown));
+      const col = g===null ? "var(--muted)" : g<0 ? "var(--coral)" : "var(--teal)";
+      return `
+        <div class="bar-row">
+          <div class="bar-label"><span>% de mejora vs mes anterior</span><b style="color:${col};">${g===null ? "—" : (g>=0?"+":"")+g.toFixed(1)+"%"}</b></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${barW}%;background:${col};"></div></div>
+        </div>`;
+    })() : `
     <div class="bar-row">
       <div class="bar-label"><span>% de ventas globales del mes</span><b class="num-pct" data-target="${pct}">0%</b></div>
       <div class="bar-track"><div class="bar-fill" data-target="${pct}%" style="width:0%"></div></div>
-    </div>
+    </div>`}
 
     <div class="points">
       <span class="plabel">Puntos a favor · trámites sin errores</span>
@@ -461,14 +1924,18 @@ async function saveToStorage(){
 
 function normalizeRow(r){
   const num = (v)=> Number(String(v).replace(/[,$\s]/g,"")) || 0;
+  const ventas_mes = num(r.ventas_mes);
   return {
     sucursal: r.sucursal?.trim(), nombre: r.nombre?.trim(), rol: r.rol?.trim(),
     rank: num(r.rank),
     ventas_dia:num(r.ventas_dia), monto_dia:num(r.monto_dia),
     ventas_semana:num(r.ventas_semana), monto_semana:num(r.monto_semana),
-    ventas_mes:num(r.ventas_mes), monto_mes:num(r.monto_mes),
+    ventas_mes:ventas_mes, monto_mes:num(r.monto_mes),
     ventas_anio:num(r.ventas_anio), monto_anio:num(r.monto_anio),
-    pct_global:num(r.pct_global), efectividad:num(r.efectividad), puntos:num(r.puntos)
+    pct_global:num(r.pct_global), efectividad:num(r.efectividad), puntos:num(r.puntos),
+    meta_mensual: r.meta_mensual!==undefined && r.meta_mensual!=="" ? num(r.meta_mensual) : Math.round(ventas_mes*1.15) || 10,
+    ventas_mes_anterior: r.ventas_mes_anterior!==undefined && r.ventas_mes_anterior!=="" ? num(r.ventas_mes_anterior) : null,
+    monto_mes_anterior: r.monto_mes_anterior!==undefined && r.monto_mes_anterior!=="" ? num(r.monto_mes_anterior) : null
   };
 }
 
@@ -481,6 +1948,7 @@ function ingestCsvText(text, sourceLabel){
     render();
     saveToStorage();
     setStatus(`Actualizado desde ${sourceLabel} · ${new Date().toLocaleTimeString("es-PA")}`, true);
+    renderSummary();
   }else{
     setStatus("El archivo no tiene filas válidas — revisa las columnas", false);
   }
@@ -496,8 +1964,8 @@ document.getElementById("csvFile").onchange = (ev)=>{
 };
 
 document.getElementById("btnTemplate").onclick = ()=>{
-  const headers = "sucursal,nombre,rol,rank,ventas_dia,monto_dia,ventas_semana,monto_semana,ventas_mes,monto_mes,ventas_anio,monto_anio,pct_global,efectividad,puntos";
-  const rows = DATA.map(e => [e.sucursal,e.nombre,e.rol,e.rank,e.ventas_dia,e.monto_dia,e.ventas_semana,e.monto_semana,e.ventas_mes,e.monto_mes,e.ventas_anio,e.monto_anio,e.pct_global,e.efectividad,e.puntos].join(","));
+  const headers = "sucursal,nombre,rol,rank,ventas_dia,monto_dia,ventas_semana,monto_semana,ventas_mes,monto_mes,ventas_anio,monto_anio,pct_global,efectividad,puntos,meta_mensual,ventas_mes_anterior,monto_mes_anterior";
+  const rows = DATA.map(e => [e.sucursal,e.nombre,e.rol,e.rank,e.ventas_dia,e.monto_dia,e.ventas_semana,e.monto_semana,e.ventas_mes,e.monto_mes,e.ventas_anio,e.monto_anio,e.pct_global,e.efectividad,e.puntos,e.meta_mensual,e.ventas_mes_anterior??"",e.monto_mes_anterior??""].join(","));
   const csv = [headers, ...rows].join("\n");
   const blob = new Blob([csv], {type:"text/csv"});
   const a = document.createElement("a");
@@ -535,6 +2003,8 @@ document.getElementById("btnStop").onclick = ()=>{
 };
 
 (async function init(){
+  applyTheme(localStorage.getItem("theme-pref") || "light");
+
   const loaded = await loadFromStorage();
   if(!loaded){ DATA = DEFAULT_DATA; }
   render();
@@ -544,7 +2014,546 @@ document.getElementById("btnStop").onclick = ()=>{
       document.getElementById("sheetUrl").value = savedUrl.value;
     }
   }catch(e){}
+
+  try{
+    const savedDisb = await storeGet("disbursements-data");
+    DISBURSEMENTS = savedDisb && savedDisb.value ? JSON.parse(savedDisb.value) : generateDemoDisbursements();
+  }catch(e){ DISBURSEMENTS = generateDemoDisbursements(); }
+  try{
+    const savedDisbUrl = await storeGet("disbursements-source-url");
+    if(savedDisbUrl && savedDisbUrl.value){
+      document.getElementById("disbUrl").value = savedDisbUrl.value;
+    }
+  }catch(e){}
+
+  try{
+    const savedLeads = await storeGet("leads-data");
+    LEADS = savedLeads && savedLeads.value ? JSON.parse(savedLeads.value) : generateDemoLeads();
+  }catch(e){ LEADS = generateDemoLeads(); }
+  try{
+    const savedLeadsUrl = await storeGet("leads-source-url");
+    if(savedLeadsUrl && savedLeadsUrl.value) document.getElementById("leadsUrl").value = savedLeadsUrl.value;
+  }catch(e){}
+
+  try{
+    const savedMora = await storeGet("mora-data");
+    MORA = savedMora && savedMora.value ? JSON.parse(savedMora.value) : generateDemoMora();
+  }catch(e){ MORA = generateDemoMora(); }
+  try{
+    const savedMoraUrl = await storeGet("mora-source-url");
+    if(savedMoraUrl && savedMoraUrl.value) document.getElementById("moraUrl").value = savedMoraUrl.value;
+  }catch(e){}
+
+  renderSummary();
+  chkRenderDates();
+  chkRenderAll();
 })();
+
+/* ============ Seguimiento de Sucursales (checklist) ============ */
+
+const CHK_TASKS = {
+  daily: [
+    "Revisar tareas pendientes del día anterior",
+    "Llamada de seguimiento con el encargado de la sucursal",
+    "Revisar leads nuevos asignados a la sucursal",
+    "Revisar cierres y ventas confirmadas del día",
+    "Verificar tiempos de respuesta en Callbell",
+    "Registrar novedades del día en el reporte de seguimiento"
+  ],
+  weekly: [
+    "Reunión semanal con el encargado de la sucursal",
+    "Revisar cumplimiento de la meta semanal de ventas",
+    "Analizar los motivos de cierre más frecuentes de la semana",
+    "Dar retroalimentación al equipo de ventas",
+    "Revisar disponibilidad de inventario / vehículos (si aplica)"
+  ],
+  monthly: [
+    "Revisar ventas reales del mes vs. meta mensual",
+    "Evaluar desempeño del encargado de sucursal",
+    "Revisar indicadores clave: leads, cierres, tasa de conversión",
+    "Definir objetivos y plan de acción del próximo mes",
+    "Preparar y enviar reporte de cierre a gerencia"
+  ]
+};
+
+const CHK_PERIOD_META = {
+  daily:   { label: "Diario",   title: "Checklist diario",   sub: "Tareas a completar cada día en la sucursal" },
+  weekly:  { label: "Semanal",  title: "Checklist semanal",  sub: "Tareas a completar una vez por semana" },
+  monthly: { label: "Mensual",  title: "Checklist mensual",  sub: "Tareas a completar una vez al mes" }
+};
+
+let chkState = { branch: 0, period: "daily", showOverview: false, cache: {} };
+
+function chkPad(n){ return n < 10 ? "0"+n : ""+n; }
+
+function chkGetISOWeek(d){
+  const date = new Date(d.getTime());
+  date.setHours(0,0,0,0);
+  date.setDate(date.getDate() + 3 - (date.getDay()+6)%7);
+  const week1 = new Date(date.getFullYear(),0,4);
+  return 1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay()+6)%7) / 7);
+}
+
+function chkPeriodKey(period, d){
+  d = d || new Date();
+  if(period === "daily") return `${d.getFullYear()}-${chkPad(d.getMonth()+1)}-${chkPad(d.getDate())}`;
+  if(period === "weekly") return `${d.getFullYear()}-W${chkPad(chkGetISOWeek(d))}`;
+  return `${d.getFullYear()}-${chkPad(d.getMonth()+1)}`;
+}
+
+function chkStorageKey(branchIdx, period, pKey){ return `check:${branchIdx}:${period}:${pKey}`; }
+function chkNotesKey(branchIdx, pKey){ return `notes:${branchIdx}:${pKey}`; }
+
+async function chkLoadState(branchIdx, period, pKey){
+  const key = chkStorageKey(branchIdx, period, pKey);
+  if(chkState.cache[key]) return chkState.cache[key];
+  try{
+    const res = await storeGet(key);
+    const val = res && res.value ? JSON.parse(res.value) : { items: new Array(CHK_TASKS[period].length).fill(false) };
+    chkState.cache[key] = val;
+    return val;
+  }catch(e){
+    const val = { items: new Array(CHK_TASKS[period].length).fill(false) };
+    chkState.cache[key] = val;
+    return val;
+  }
+}
+
+async function chkSaveState(branchIdx, period, pKey, val){
+  const key = chkStorageKey(branchIdx, period, pKey);
+  chkState.cache[key] = val;
+  try{ await storeSet(key, JSON.stringify(val)); chkShowToast(); }
+  catch(e){ console.error("storage error", e); }
+}
+
+async function chkLoadNotes(branchIdx, pKey){
+  try{ const res = await storeGet(chkNotesKey(branchIdx, pKey)); return res && res.value ? res.value : ""; }
+  catch(e){ return ""; }
+}
+async function chkSaveNotes(branchIdx, pKey, text){
+  try{ await storeSet(chkNotesKey(branchIdx, pKey), text); chkShowToast("Nota guardada"); }
+  catch(e){ console.error(e); }
+}
+
+let chkToastTimer;
+function chkShowToast(msg){
+  const t = document.getElementById("chkToast");
+  if(!t) return;
+  t.textContent = msg || "Guardado";
+  t.classList.add("show");
+  clearTimeout(chkToastTimer);
+  chkToastTimer = setTimeout(()=>t.classList.remove("show"), 1200);
+}
+
+function chkPctColor(p){
+  if(p >= 80) return "#159688";
+  if(p >= 40) return "#E9C46A";
+  if(p > 0) return "#D64545";
+  return "var(--ring-track)";
+}
+
+function chkRenderDates(){
+  const now = new Date();
+  const days = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+  const months = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  document.getElementById("chkTodayLabel").textContent = `${days[now.getDay()]}, ${now.getDate()} de ${months[now.getMonth()]} de ${now.getFullYear()}`;
+  document.getElementById("chkWeekLabel").textContent = chkPeriodKey("weekly", now);
+  document.getElementById("chkMonthLabel").textContent = months[now.getMonth()] + " " + now.getFullYear();
+}
+
+function chkRenderBranchTabs(){
+  const row = document.getElementById("chkBranchRow");
+  row.innerHTML = "";
+  BRANCH_ORDER.forEach((name, idx) => {
+    const btn = document.createElement("div");
+    btn.className = "chk-branch-btn" + (chkState.branch === idx && !chkState.showOverview ? " active" : "");
+    btn.innerHTML = `<div class="bname">${name}</div><div class="bpct" id="chk-bpct-${idx}" style="color:${branchColor(name)};">—</div><div class="blabel">cumplimiento de hoy</div>`;
+    btn.onclick = () => { chkState.showOverview = false; chkState.branch = idx; chkRenderAll(); };
+    row.appendChild(btn);
+  });
+  const allBtn = document.createElement("div");
+  allBtn.className = "chk-branch-btn" + (chkState.showOverview ? " active" : "");
+  allBtn.style.maxWidth = "170px";
+  allBtn.innerHTML = `<div class="bname">📊 Todas</div><div class="bpct" style="color:var(--navy);">Ver</div><div class="blabel">resumen general</div>`;
+  allBtn.onclick = () => { chkState.showOverview = true; chkRenderAll(); };
+  row.appendChild(allBtn);
+}
+
+function chkRenderPeriodTabs(){
+  const row = document.getElementById("chkPeriodRow");
+  row.innerHTML = "";
+  Object.keys(CHK_PERIOD_META).forEach(p => {
+    const btn = document.createElement("button");
+    btn.className = "chk-period-btn" + (chkState.period === p ? " active" : "");
+    btn.textContent = CHK_PERIOD_META[p].label;
+    btn.onclick = () => { chkState.period = p; chkRenderDetail(); };
+    row.appendChild(btn);
+  });
+}
+
+async function chkRenderDetail(){
+  chkRenderPeriodTabs();
+  const period = chkState.period, branchIdx = chkState.branch;
+  const pKey = chkPeriodKey(period);
+  const meta = CHK_PERIOD_META[period];
+  document.getElementById("chkPeriodTitle").textContent = `${meta.title} — ${BRANCH_ORDER[branchIdx]}`;
+  document.getElementById("chkPeriodSub").textContent = `${meta.sub} · Periodo: ${pKey}`;
+
+  const val = await chkLoadState(branchIdx, period, pKey);
+  const tasks = CHK_TASKS[period];
+  const list = document.getElementById("chkTaskList");
+  list.innerHTML = "";
+  tasks.forEach((task, i) => {
+    const done = !!val.items[i];
+    const row = document.createElement("div");
+    row.className = "chk-task" + (done ? " done" : "");
+    row.innerHTML = `
+      <div class="tnum">${i+1}</div>
+      <input type="checkbox" id="chk-item-${i}" ${done ? "checked" : ""}>
+      <label for="chk-item-${i}">${task}</label>
+    `;
+    row.querySelector("input").addEventListener("change", async (ev) => {
+      val.items[i] = ev.target.checked;
+      await chkSaveState(branchIdx, period, pKey, val);
+      await chkUpdateHistoryEntry(branchIdx, period, pKey, val.items);
+      row.classList.toggle("done", ev.target.checked);
+      chkUpdateProgress(val.items);
+      chkRenderBranchPct();
+      if(chkState.showOverview) chkRenderOverview();
+    });
+    list.appendChild(row);
+  });
+  chkUpdateProgress(val.items);
+
+  document.getElementById("chkResetBtn").onclick = async () => {
+    val.items = new Array(tasks.length).fill(false);
+    await chkSaveState(branchIdx, period, pKey, val);
+    await chkUpdateHistoryEntry(branchIdx, period, pKey, val.items);
+    chkRenderDetail();
+    chkRenderBranchPct();
+  };
+
+  const dKey = chkPeriodKey("daily");
+  const notesArea = document.getElementById("chkNotesArea");
+  notesArea.value = await chkLoadNotes(branchIdx, dKey);
+  let notesTimer;
+  notesArea.oninput = () => {
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => chkSaveNotes(branchIdx, dKey, notesArea.value), 600);
+  };
+
+  await chkRenderHistory(branchIdx);
+}
+
+function chkUpdateProgress(items){
+  const total = items.length, done = items.filter(Boolean).length;
+  const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById("chkProgressFill").style.width = pct + "%";
+  document.getElementById("chkProgressLabel").textContent = `${done}/${total} · ${pct}%`;
+}
+
+async function chkUpdateHistoryEntry(branchIdx, period, pKey, items){
+  const key = `history:${branchIdx}`;
+  let hist;
+  try{ const res = await storeGet(key); hist = res && res.value ? JSON.parse(res.value) : { daily:{}, weekly:{}, monthly:{} }; }
+  catch(e){ hist = { daily:{}, weekly:{}, monthly:{} }; }
+  const total = items.length, done = items.filter(Boolean).length;
+  hist[period][pKey] = total ? Math.round((done/total)*100) : 0;
+  try{ await storeSet(key, JSON.stringify(hist)); }catch(e){ console.error(e); }
+}
+
+async function chkGetHistory(branchIdx){
+  try{
+    const res = await storeGet(`history:${branchIdx}`);
+    return res && res.value ? JSON.parse(res.value) : { daily:{}, weekly:{}, monthly:{} };
+  }catch(e){ return { daily:{}, weekly:{}, monthly:{} }; }
+}
+
+async function chkRenderHistory(branchIdx){
+  const hist = await chkGetHistory(branchIdx);
+  const grid = document.getElementById("chkHistoryGrid");
+  grid.innerHTML = "";
+  const now = new Date();
+  for(let i = 13; i >= 0; i--){
+    const d = new Date(now); d.setDate(now.getDate() - i);
+    const key = chkPeriodKey("daily", d);
+    const pct = hist.daily[key];
+    const cell = document.createElement("div");
+    cell.className = "chk-hcell";
+    cell.style.background = pct === undefined ? "var(--ring-track)" : chkPctColor(pct);
+    cell.title = `${key}: ${pct === undefined ? "sin datos" : pct + "%"}`;
+    cell.innerHTML = `<div class="hd">${d.getDate()}</div>${pct !== undefined ? pct+"%" : ""}`;
+    grid.appendChild(cell);
+  }
+}
+
+async function chkRenderBranchPct(){
+  for(let idx = 0; idx < BRANCH_ORDER.length; idx++){
+    const val = await chkLoadState(idx, "daily", chkPeriodKey("daily"));
+    const total = val.items.length, done = val.items.filter(Boolean).length;
+    const el = document.getElementById(`chk-bpct-${idx}`);
+    if(el) el.textContent = (total ? Math.round((done/total)*100) : 0) + "%";
+  }
+}
+
+async function chkRenderOverview(){
+  const grid = document.getElementById("chkOverviewGrid");
+  grid.innerHTML = "";
+  for(let idx = 0; idx < BRANCH_ORDER.length; idx++){
+    const dVal = await chkLoadState(idx, "daily", chkPeriodKey("daily"));
+    const wVal = await chkLoadState(idx, "weekly", chkPeriodKey("weekly"));
+    const mVal = await chkLoadState(idx, "monthly", chkPeriodKey("monthly"));
+    const pct = (v) => v.items.length ? Math.round((v.items.filter(Boolean).length / v.items.length) * 100) : 0;
+    const dPct = pct(dVal), wPct = pct(wVal), mPct = pct(mVal);
+    const card = document.createElement("div");
+    card.className = "chk-ov-card";
+    card.innerHTML = `
+      <div class="chk-ov-name" style="color:${branchColor(BRANCH_ORDER[idx])};">${BRANCH_ORDER[idx]}</div>
+      <div class="chk-ov-row">Diario <b>${dPct}%</b></div>
+      <div class="chk-ov-bar"><div class="chk-ov-bar-fill" style="width:${dPct}%; background:${chkPctColor(dPct)};"></div></div>
+      <div class="chk-ov-row">Semanal <b>${wPct}%</b></div>
+      <div class="chk-ov-bar"><div class="chk-ov-bar-fill" style="width:${wPct}%; background:${chkPctColor(wPct)};"></div></div>
+      <div class="chk-ov-row">Mensual <b>${mPct}%</b></div>
+      <div class="chk-ov-bar"><div class="chk-ov-bar-fill" style="width:${mPct}%; background:${chkPctColor(mPct)};"></div></div>
+    `;
+    card.onclick = () => { chkState.showOverview = false; chkState.branch = idx; chkRenderAll(); };
+    grid.appendChild(card);
+  }
+}
+
+/* ============ Leads & Cartera ============ */
+
+function currentMonthKeyLeads(){
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+}
+
+function renderFunnelGrid(){
+  const curKey = currentMonthKeyLeads();
+  const grid = document.getElementById("funnelGrid");
+  const rowsThisMonth = LEADS.filter(r=>String(r.fecha).slice(0,7)===curKey);
+  const source = rowsThisMonth.length ? rowsThisMonth : LEADS;
+
+  grid.innerHTML = BRANCH_ORDER.map(branch=>{
+    const rows = source.filter(r=>r.sucursal===branch);
+    const leads = rows.reduce((s,r)=>s+Number(r.leads||0),0);
+    const contactados = rows.reduce((s,r)=>s+Number(r.contactados||0),0);
+    const cerrados = rows.reduce((s,r)=>s+Number(r.cerrados||0),0);
+    const pctContact = leads ? Math.round(contactados/leads*100) : 0;
+    const pctCierre = contactados ? Math.round(cerrados/contactados*100) : 0;
+    const col = branchColor(branch);
+    return `
+      <div class="funnel-card">
+        <div class="fname" style="color:${col};">${branch}</div>
+        <div class="funnel-stage">
+          <div class="fs-label"><span>Leads</span><b>${leads}</b></div>
+          <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:100%;background:${col};opacity:.9;"></div></div>
+        </div>
+        <div class="funnel-stage">
+          <div class="fs-label"><span>Contactados</span><b>${contactados}</b></div>
+          <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:${Math.min(100,pctContact)}%;background:${col};opacity:.65;"></div></div>
+          <div class="funnel-conv">${pctContact}% de los leads</div>
+        </div>
+        <div class="funnel-stage">
+          <div class="fs-label"><span>Cerrados</span><b>${cerrados}</b></div>
+          <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:${Math.min(100,pctCierre)}%;background:${col};"></div></div>
+          <div class="funnel-conv">${pctCierre}% de los contactados</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderFuenteTable(){
+  const curKey = currentMonthKeyLeads();
+  const rowsThisMonth = LEADS.filter(r=>String(r.fecha).slice(0,7)===curKey);
+  const source = rowsThisMonth.length ? rowsThisMonth : LEADS;
+  const fuentes = [...new Set(source.map(r=>r.fuente))];
+
+  const rows = fuentes.map(fuente=>{
+    const rs = source.filter(r=>r.fuente===fuente);
+    const leads = rs.reduce((s,r)=>s+Number(r.leads||0),0);
+    const contactados = rs.reduce((s,r)=>s+Number(r.contactados||0),0);
+    const cerrados = rs.reduce((s,r)=>s+Number(r.cerrados||0),0);
+    const conv = leads ? (cerrados/leads*100) : 0;
+    return {fuente, leads, contactados, cerrados, conv};
+  }).sort((a,b)=>b.conv-a.conv);
+
+  const totalLeads = rows.reduce((s,r)=>s+r.leads,0);
+  const totalCerrados = rows.reduce((s,r)=>s+r.cerrados,0);
+
+  const body = rows.map(r=>`<tr><td>${r.fuente}</td><td>${r.leads}</td><td>${r.contactados}</td><td>${r.cerrados}</td><td>${r.conv.toFixed(1)}%</td></tr>`).join("");
+  const totalRow = `<tr class="total-row"><td>Total</td><td>${totalLeads}</td><td>${rows.reduce((s,r)=>s+r.contactados,0)}</td><td>${totalCerrados}</td><td>${totalLeads?(totalCerrados/totalLeads*100).toFixed(1):0}%</td></tr>`;
+
+  document.getElementById("fuenteTableWrap").innerHTML = rows.length
+    ? `<table class="monthly-table"><tr><th style="text-align:left;">Fuente</th><th>Leads</th><th>Contactados</th><th>Cerrados</th><th>% conversión</th></tr>${body}${totalRow}</table>`
+    : "<p class='mini-note'>No hay leads cargados todavía.</p>";
+}
+
+function renderMoraChart(){
+  const wrap = document.getElementById("moraChartWrap");
+  if(!MORA.length){ wrap.innerHTML = "<p class='mini-note'>No hay datos de cartera cargados todavía.</p>"; return; }
+
+  const byMonth = {};
+  MORA.forEach(r=>{
+    const k = String(r.fecha).slice(0,7);
+    if(!byMonth[k]) byMonth[k] = {cancelaciones:0, abono_capital:0};
+    byMonth[k].cancelaciones += Number(r.cancelaciones||0);
+    byMonth[k].abono_capital += Number(r.abono_capital||0);
+  });
+  const keys = Object.keys(byMonth).sort();
+  if(keys.length < 2){ wrap.innerHTML = "<p class='mini-note'>Se necesitan al menos 2 meses de datos de cartera para graficar.</p>"; return; }
+
+  const series = ["Cancelaciones","Abono a capital"];
+  const seriesColor = {"Cancelaciones":"var(--coral)","Abono a capital":"var(--teal)"};
+  const valueFn = (k,s)=> s==="Cancelaciones" ? byMonth[k].cancelaciones : byMonth[k].abono_capital;
+  const labelFn = (k)=>{ const [y,m]=k.split("-").map(Number); return MES_NOMBRES[m-1].slice(0,3)+" "+y; };
+
+  const W=760,H=190,padL=50,padR=16,padT=16,padB=28;
+  const maxVal = Math.max(1, ...keys.flatMap(k=>series.map(s=>valueFn(k,s))));
+  const x = i => padL + (keys.length>1 ? i*((W-padL-padR)/(keys.length-1)) : (W-padL-padR)/2);
+  const y = v => H-padB - (v/maxVal)*(H-padT-padB);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:100%;">`;
+  svg += `<line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)"/>`;
+  keys.forEach((k,i)=> svg += `<text x="${x(i)}" y="${H-8}" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace" text-anchor="middle">${labelFn(k)}</text>`);
+  series.forEach(s=>{
+    const pts = keys.map((k,i)=> `${x(i)},${y(valueFn(k,s))}`).join(" ");
+    const col = seriesColor[s];
+    svg += `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    keys.forEach((k,i)=> svg += `<circle cx="${x(i)}" cy="${y(valueFn(k,s))}" r="3.5" fill="${col}" stroke="var(--surface)" stroke-width="1.5"/>`);
+  });
+  svg += `</svg><div class="chart-legend">${series.map(s=>`<span><span class="dot" style="background:${seriesColor[s]}"></span>${s}</span>`).join("")}</div>`;
+  wrap.innerHTML = svg;
+}
+
+function renderLeadsPage(){
+  renderFunnelGrid();
+  renderFuenteTable();
+  renderMoraChart();
+}
+
+function normalizeLeadRow(r){
+  const num = (v)=> Number(String(v).replace(/[,$\s]/g,"")) || 0;
+  return { fecha:String(r.fecha||"").trim(), sucursal:r.sucursal?.trim(), fuente:r.fuente?.trim(), leads:num(r.leads), contactados:num(r.contactados), cerrados:num(r.cerrados) };
+}
+function normalizeMoraRow(r){
+  const num = (v)=> Number(String(v).replace(/[,$\s]/g,"")) || 0;
+  return { fecha:String(r.fecha||"").trim(), sucursal:r.sucursal?.trim(), cancelaciones:num(r.cancelaciones), abono_capital:num(r.abono_capital) };
+}
+
+function setLeadsStatus(text, ok){ document.getElementById("leadsStatusLine").innerHTML = ok ? "<strong>"+text+"</strong>" : text; }
+function setMoraStatus(text, ok){ document.getElementById("moraStatusLine").innerHTML = ok ? "<strong>"+text+"</strong>" : text; }
+
+function ingestLeadsCsv(text, label){
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  const rows = parsed.data.map(normalizeLeadRow).filter(r=>r.sucursal && r.fuente);
+  if(rows.length){
+    LEADS = rows;
+    storeSet("leads-data", JSON.stringify(rows)).catch(()=>{});
+    setLeadsStatus(`Actualizado desde ${label} · ${new Date().toLocaleTimeString("es-PA")}`, true);
+    renderLeadsPage();
+  }else{ setLeadsStatus("El archivo no tiene filas válidas — revisa las columnas", false); }
+}
+function ingestMoraCsv(text, label){
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
+  const rows = parsed.data.map(normalizeMoraRow).filter(r=>r.sucursal && r.fecha);
+  if(rows.length){
+    MORA = rows;
+    storeSet("mora-data", JSON.stringify(rows)).catch(()=>{});
+    setMoraStatus(`Actualizado desde ${label} · ${new Date().toLocaleTimeString("es-PA")}`, true);
+    renderLeadsPage();
+  }else{ setMoraStatus("El archivo no tiene filas válidas — revisa las columnas", false); }
+}
+
+document.getElementById("btnLeadsUpload").onclick = ()=> document.getElementById("leadsFile").click();
+document.getElementById("leadsFile").onchange = (ev)=>{
+  const file = ev.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> ingestLeadsCsv(reader.result, file.name);
+  reader.readAsText(file);
+};
+document.getElementById("btnMoraUpload").onclick = ()=> document.getElementById("moraFile").click();
+document.getElementById("moraFile").onchange = (ev)=>{
+  const file = ev.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> ingestMoraCsv(reader.result, file.name);
+  reader.readAsText(file);
+};
+
+async function fetchLeadsFromUrl(url){
+  try{ const res = await fetch(url,{cache:"no-store"}); if(!res.ok) throw new Error("HTTP "+res.status); ingestLeadsCsv(await res.text(), "la fuente conectada"); }
+  catch(e){ setLeadsStatus("No se pudo leer la URL (revisa que el CSV sea público)", false); }
+}
+async function fetchMoraFromUrl(url){
+  try{ const res = await fetch(url,{cache:"no-store"}); if(!res.ok) throw new Error("HTTP "+res.status); ingestMoraCsv(await res.text(), "la fuente conectada"); }
+  catch(e){ setMoraStatus("No se pudo leer la URL (revisa que el CSV sea público)", false); }
+}
+document.getElementById("btnLeadsConnect").onclick = async ()=>{
+  const url = document.getElementById("leadsUrl").value.trim(); if(!url) return;
+  await storeSet("leads-source-url", url).catch(()=>{});
+  await fetchLeadsFromUrl(url);
+  setInterval(()=>fetchLeadsFromUrl(url), 5*60*1000);
+};
+document.getElementById("btnMoraConnect").onclick = async ()=>{
+  const url = document.getElementById("moraUrl").value.trim(); if(!url) return;
+  await storeSet("mora-source-url", url).catch(()=>{});
+  await fetchMoraFromUrl(url);
+  setInterval(()=>fetchMoraFromUrl(url), 5*60*1000);
+};
+
+document.getElementById("btnLeadsTemplate").onclick = ()=>{
+  const headers = "fecha,sucursal,fuente,leads,contactados,cerrados";
+  const rows = LEADS.map(r=>[r.fecha,r.sucursal,r.fuente,r.leads,r.contactados,r.cerrados].join(","));
+  const blob = new Blob([[headers,...rows].join("\n")], {type:"text/csv"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "plantilla_leads.csv"; a.click();
+};
+document.getElementById("btnMoraTemplate").onclick = ()=>{
+  const headers = "fecha,sucursal,cancelaciones,abono_capital";
+  const rows = MORA.map(r=>[r.fecha,r.sucursal,r.cancelaciones,r.abono_capital].join(","));
+  const blob = new Blob([[headers,...rows].join("\n")], {type:"text/csv"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "plantilla_cartera.csv"; a.click();
+};
+
+async function chkRenderAll(){
+  chkRenderBranchTabs();
+  document.getElementById("chkOverviewSection").style.display = chkState.showOverview ? "block" : "none";
+  document.getElementById("chkDetailSection").style.display = chkState.showOverview ? "none" : "block";
+  if(chkState.showOverview) await chkRenderOverview();
+  else await chkRenderDetail();
+  await chkRenderBranchPct();
+}
+
+async function renderChecklistSummaryForHome(){
+  const container = document.getElementById("biSeguimientoResumen");
+  if(!container) return;
+  container.innerHTML = "<p class='mini-note' style='margin:0;'>Cargando…</p>";
+  const rows = await Promise.all(BRANCH_ORDER.map(async (name, idx)=>{
+    const dVal = await chkLoadState(idx, "daily", chkPeriodKey("daily"));
+    const wVal = await chkLoadState(idx, "weekly", chkPeriodKey("weekly"));
+    const mVal = await chkLoadState(idx, "monthly", chkPeriodKey("monthly"));
+    const pct = v => v.items.length ? Math.round((v.items.filter(Boolean).length/v.items.length)*100) : 0;
+    const bMonto = DATA.filter(e=>e.sucursal===name).reduce((s,e)=>s+Number(e.monto_mes||0),0);
+    return {name, d:pct(dVal), w:pct(wVal), m:pct(mVal), bMonto};
+  }));
+  container.innerHTML = rows.map(r=>`
+    <div class="chk-mini-card" data-goto-branch="${r.name}">
+      <div class="chk-mini-name" style="color:${branchColor(r.name)}">${r.name}</div>
+      <div class="chk-mini-row"><span>Vendido este mes</span><b>${fmtMoney(r.bMonto)}</b></div>
+      <div class="chk-mini-row"><span>Diario</span><b>${r.d}%</b></div>
+      <div class="chk-ov-bar"><div class="chk-ov-bar-fill" style="width:${r.d}%;background:${chkPctColor(r.d)}"></div></div>
+      <div class="chk-mini-row"><span>Semanal</span><b>${r.w}%</b></div>
+      <div class="chk-ov-bar"><div class="chk-ov-bar-fill" style="width:${r.w}%;background:${chkPctColor(r.w)}"></div></div>
+      <div class="chk-mini-row"><span>Mensual</span><b>${r.m}%</b></div>
+      <div class="chk-ov-bar"><div class="chk-ov-bar-fill" style="width:${r.m}%;background:${chkPctColor(r.m)}"></div></div>
+    </div>`).join("");
+  container.querySelectorAll(".chk-mini-card").forEach((card,idx)=>{
+    card.onclick = ()=>{
+      chkState.showOverview = false;
+      chkState.branch = idx;
+      document.querySelector('#pageNav .page-tab[data-page="seguimiento"]').click();
+    };
+  });
+}
 </script>
 </body>
 </html>
