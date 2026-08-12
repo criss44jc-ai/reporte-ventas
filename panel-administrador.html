@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Administración — Financiera Autocash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#14213D; --asphalt:#3A3F44; --paper:#F1EFE9; --paper2:#E8E5DC;
+    --amber:#F4A11B; --teal:#1F7A6C; --green:#3FA34D; --red:#D6534A;
+    --line:#D2CDC0; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;min-height:100vh;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px;}
+  h1{font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 4px;color:var(--paper);}
+  .sub{color:#9AA3B5;font-size:13px;margin-bottom:26px;}
+
+  .login-card{max-width:420px;margin:60px auto;background:var(--white);color:var(--ink);border-radius:10px;padding:28px;}
+  .login-card h2{font-family:'Oswald',sans-serif;font-size:22px;margin:0 0 8px;}
+  .login-card p{font-size:14px;color:var(--asphalt);margin-bottom:18px;line-height:1.5;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--asphalt);margin-bottom:5px;}
+  .field input{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:6px;font-family:'Inter';font-size:15px;background:var(--paper);box-sizing:border-box;}
+  .field-pass{position:relative;}
+  .field-pass input{padding-right:44px;}
+  .eye-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:6px;color:var(--asphalt);}
+  .eye-toggle:hover{color:var(--ink);}
+  .btn{background:var(--ink);color:var(--white);border:none;border-radius:6px;padding:12px 18px;font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;}
+  .btn:hover{opacity:.85;}
+  .btn.amber{background:var(--amber);color:var(--ink);}
+  .err{color:var(--red);font-size:13px;margin-top:8px;display:none;}
+
+  #adminScreen{display:none;}
+  .panel{background:var(--white);color:var(--ink);border-radius:10px;padding:24px;margin-bottom:24px;}
+  .panel h2{font-family:'Oswald',sans-serif;font-size:19px;margin:0 0 4px;}
+  .panel .desc{font-size:13.5px;color:var(--asphalt);margin-bottom:18px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tab{padding:8px 16px;border-radius:6px;font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;border:1.5px solid var(--line);background:var(--paper);color:var(--asphalt);}
+  .tab.active{background:var(--ink);color:var(--white);border-color:var(--ink);}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--asphalt);border-bottom:2px solid var(--line);padding:8px 10px;}
+  td{padding:9px 10px;border-bottom:1px solid var(--paper2);vertical-align:top;}
+  tr:hover td{background:var(--paper);}
+  .badge-flag{background:#FBEAE8;color:#A6362D;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:600;}
+  .badge-ok{background:#E9F6EA;color:#1F6B2C;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:600;}
+  .score{font-family:'JetBrains Mono',monospace;font-weight:700;}
+  .empty{color:var(--asphalt);font-size:14px;padding:20px 0;text-align:center;}
+  .detail-btn{font-size:11.5px;color:var(--teal);text-decoration:underline;cursor:pointer;background:none;border:none;padding:0;}
+
+  .val-upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:16px;}
+  @media (max-width:640px){ .val-upload-grid{grid-template-columns:1fr;} }
+  .upload-card{border:1.5px solid var(--line);border-radius:8px;padding:14px;background:var(--paper);}
+  .upload-card .preview{width:100%;height:140px;background:var(--paper2);border-radius:6px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;justify-content:center;color:var(--asphalt);font-size:12px;}
+  .upload-card .preview img{width:100%;height:100%;object-fit:cover;}
+  .upload-card input[type=file]{width:100%;font-size:13px;}
+  .upload-card label{display:block;font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;margin-bottom:8px;}
+
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:var(--white);padding:12px 18px;border-radius:6px;font-size:14px;display:none;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+
+  .setup-note{background:#FDF3E3;border:1.5px solid var(--amber);color:#8A5A0A;border-radius:8px;padding:14px 16px;font-size:13.5px;line-height:1.5;margin-bottom:20px;}
+  .setup-note code{background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;}
+
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:50;align-items:center;justify-content:center;padding:20px;}
+  .modal-box{background:var(--white);color:var(--ink);border-radius:10px;max-width:640px;width:100%;max-height:80vh;overflow-y:auto;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--paper2);position:sticky;top:0;background:var(--white);}
+  .modal-head h3{font-family:'Oswald',sans-serif;font-size:17px;margin:0;}
+  .modal-close{background:none;border:none;font-size:16px;cursor:pointer;color:var(--asphalt);}
+  .modal-body{padding:18px 22px;}
+  .detail-item{border-bottom:1px solid var(--paper2);padding:12px 0;}
+  .detail-item:last-child{border-bottom:none;}
+  .detail-q{font-weight:600;font-size:14px;margin-bottom:4px;}
+  .detail-a{font-size:13.5px;margin-bottom:3px;}
+  .detail-fb{font-size:12.5px;color:var(--asphalt);}
+  .detail-good .detail-a{color:#1F6B2C;}
+  .detail-bad .detail-a{color:#A6362D;}
+  .detail-mid .detail-a{color:#8A5A0A;}
+
+  .eval-summary{display:flex;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--paper2);margin-bottom:14px;}
+  .eval-score{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;color:var(--ink);line-height:1;}
+  .eval-score span{font-size:15px;color:var(--asphalt);font-weight:500;}
+  .eval-verdict{font-weight:600;font-size:14.5px;margin-bottom:3px;}
+  .eval-sub{font-size:12.5px;color:var(--asphalt);}
+  .eval-cats{margin-bottom:18px;}
+  .eval-cat-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .eval-cat-name{font-size:11.5px;width:110px;flex-shrink:0;text-transform:capitalize;color:var(--asphalt);}
+  .eval-cat-bar{flex:1;height:8px;background:var(--paper2);border-radius:4px;overflow:hidden;}
+  .eval-cat-fill{height:100%;background:var(--teal);border-radius:4px;}
+  .eval-cat-val{font-family:'JetBrains Mono',monospace;font-size:11px;width:36px;text-align:right;}
+
+  .share-tabs{display:flex;gap:8px;margin-bottom:18px;}
+  .share-tab{padding:8px 14px;border-radius:6px;font-family:'Oswald',sans-serif;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;border:1.5px solid var(--line);background:var(--paper);color:var(--asphalt);}
+  .share-tab.active{background:var(--ink);color:var(--white);border-color:var(--ink);}
+  .field select{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:6px;font-family:'Inter';font-size:15px;background:var(--paper);box-sizing:border-box;}
+  .share-result{margin-top:18px;}
+  .share-card{border:1.5px solid var(--line);border-radius:8px;padding:16px;background:var(--paper);margin-bottom:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+  .share-qr{background:var(--white);padding:8px;border-radius:6px;border:1px solid var(--line);flex-shrink:0;}
+  .share-info{flex:1;min-width:200px;}
+  .share-label{font-family:'Oswald',sans-serif;font-weight:600;font-size:13.5px;margin-bottom:6px;}
+  .share-url{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--asphalt);word-break:break-all;background:var(--white);border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin-bottom:8px;}
+  .copy-btn{font-size:12px;padding:6px 12px;border-radius:5px;border:1.5px solid var(--ink);background:var(--white);color:var(--ink);cursor:pointer;font-family:'Oswald',sans-serif;text-transform:uppercase;}
+  .copy-btn:hover{background:var(--ink);color:var(--white);}
+
+  .survey-overall{display:flex;align-items:center;gap:16px;padding:16px 0;margin-bottom:16px;border-bottom:1px solid var(--paper2);}
+  .survey-overall .big{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:var(--ink);}
+  .survey-overall .stars-display{color:#F4A11B;font-size:18px;letter-spacing:2px;}
+  .survey-overall .count{font-size:12.5px;color:var(--asphalt);}
+  .survey-cat-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+  .survey-cat-name{font-size:12px;width:220px;flex-shrink:0;color:var(--asphalt);}
+  .survey-cat-bar{flex:1;height:8px;background:var(--paper2);border-radius:4px;overflow:hidden;}
+  .survey-cat-fill{height:100%;background:#F4A11B;border-radius:4px;}
+  .survey-cat-val{font-family:'JetBrains Mono',monospace;font-size:11.5px;width:32px;text-align:right;}
+  .vendor-rank{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--paper2);font-size:13.5px;}
+  .vendor-rank:last-child{border-bottom:none;}
+  .vendor-rank .name{flex:1;font-weight:600;}
+  .vendor-rank .stars-display{color:#F4A11B;}
+  .comment-card{border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:8px;background:var(--paper);font-size:13px;}
+  .comment-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--asphalt);margin-bottom:4px;text-transform:uppercase;}
+
+  .qsection-label{font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--asphalt);margin-bottom:10px;}
+  .qcard{border:1.5px solid var(--line);border-radius:8px;margin-bottom:10px;background:var(--paper);overflow:hidden;}
+  .qcard.inactive{opacity:.7;}
+  .qcard-head{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;}
+  .qcard-cat{font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;color:var(--teal);background:#E4F0EE;padding:2px 7px;border-radius:4px;white-space:nowrap;}
+  .qcard-text{flex:1;font-size:13.5px;line-height:1.4;}
+  .qcard-arrows{display:flex;flex-direction:column;gap:2px;}
+  .qcard-arrows button, .opt-arrows button{background:var(--white);border:1px solid var(--line);border-radius:4px;width:22px;height:20px;cursor:pointer;font-size:11px;line-height:1;padding:0;}
+  .qcard-arrows button:hover, .opt-arrows button:hover{background:var(--paper2);}
+  .qcard-toggle{width:40px;height:22px;border-radius:12px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:var(--line);}
+  .qcard-toggle.on{background:var(--green);}
+  .qcard-toggle .dot{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--white);transition:left .15s;}
+  .qcard-toggle.on .dot{left:20px;}
+  .qcard-chevron{font-size:12px;color:var(--asphalt);}
+  .qcard-opts{display:none;padding:0 14px 14px;border-top:1px dashed var(--line);}
+  .qcard-opts.open{display:block;}
+  .opt-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--paper2);}
+  .opt-row:last-child{border-bottom:none;}
+  .opt-letter{font-family:'Oswald',sans-serif;font-weight:700;color:var(--asphalt);width:16px;}
+  .opt-text{flex:1;font-size:13px;}
+  .opt-fb{font-size:10.5px;padding:1px 6px;border-radius:3px;font-weight:600;text-transform:uppercase;}
+  .opt-fb.good{background:#E9F6EA;color:#1F6B2C;}
+  .opt-fb.bad{background:#FBEAE8;color:#A6362D;}
+  .opt-fb.mid{background:#FDF3E3;color:#8A5A0A;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Financiera Autocash</h1>
+  <div class="sub">Panel de administración — resultados de pruebas y fotos del ejercicio de avalúo</div>
+
+  <div id="loginScreen">
+    <div class="login-card">
+      <h2>Acceso de administrador</h2>
+      <p>Ingresa tu clave de administrador. Solo quien tenga esta clave puede ver los resultados.</p>
+      <div class="field">
+        <label>Clave de administrador</label>
+        <div class="field-pass">
+          <input type="password" id="keyInput" placeholder="••••••••">
+          <button type="button" class="eye-toggle" onclick="togglePass('keyInput', this)">👁</button>
+        </div>
+      </div>
+      <button class="btn amber" onclick="login()">Entrar</button>
+      <div class="err" id="loginErr">Clave incorrecta o no se pudo conectar. Revisa la URL de Apps Script configurada en este archivo y tu clave.</div>
+    </div>
+  </div>
+
+  <div id="adminScreen">
+    <div class="panel">
+      <h2>⚙️ Configuración de administrador</h2>
+      <div class="desc">Cambia tu clave de acceso cuando quieras, sin tener que editar el código de Apps Script.</div>
+      <div class="field">
+        <label>Nueva clave de administrador</label>
+        <div class="field-pass">
+          <input type="password" id="newKeyInput" placeholder="Escribe la nueva clave">
+          <button type="button" class="eye-toggle" onclick="togglePass('newKeyInput', this)">👁</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Confirmar nueva clave</label>
+        <div class="field-pass">
+          <input type="password" id="newKeyConfirm" placeholder="Repite la nueva clave">
+          <button type="button" class="eye-toggle" onclick="togglePass('newKeyConfirm', this)">👁</button>
+        </div>
+      </div>
+      <button class="btn" onclick="changeAdminKey()">Cambiar clave</button>
+    </div>
+
+    <div class="panel">
+      <h2>🔗 Compartir prueba</h2>
+      <div class="desc">Genera un enlace (con código QR) para una persona específica, o varios códigos por sucursal con orden de respuestas distinto — así dos personas en la misma oficina no ven la misma opción en la misma posición.</div>
+
+      <div class="share-tabs">
+        <div class="share-tab active" data-t="directo" onclick="setShareTab('directo')">Enlace directo a una persona</div>
+        <div class="share-tab" data-t="sucursal" onclick="setShareTab('sucursal')">QR por sucursal (sin nombre)</div>
+      </div>
+
+      <div id="shareDirecto">
+        <div class="field">
+          <label>Prueba</label>
+          <select id="shareTestType">
+            <option value="candidatos">Candidatos nuevos</option>
+            <option value="agentes">Agentes (revisión periódica)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nombre de la persona</label>
+          <input type="text" id="shareName" placeholder="Ej. María López">
+        </div>
+        <div class="field">
+          <label>Sucursal (opcional)</label>
+          <input type="text" id="shareBranch" placeholder="Ej. Chorrera">
+        </div>
+        <div class="field">
+          <label>Variante de orden de respuestas</label>
+          <select id="shareVariant">
+            <option value="A">Variante A</option>
+            <option value="B">Variante B</option>
+            <option value="C">Variante C</option>
+          </select>
+        </div>
+        <button class="btn amber" onclick="generateDirectLink()">Generar enlace y QR</button>
+        <div id="directResult" class="share-result"></div>
+      </div>
+
+      <div id="shareSucursal" style="display:none;">
+        <div class="field">
+          <label>Prueba</label>
+          <select id="shareTestType2">
+            <option value="candidatos">Candidatos nuevos</option>
+            <option value="agentes">Agentes (revisión periódica)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Sucursal (opcional, solo para identificar el resultado)</label>
+          <input type="text" id="shareBranch2" placeholder="Ej. Casa Matriz">
+        </div>
+        <button class="btn amber" onclick="generateBranchLinks()">Generar 3 códigos QR (A, B, C)</button>
+        <div id="branchResult" class="share-result"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>📷 Fotos del ejercicio de avalúo</h2>
+      <div class="desc">Estas dos fotos se muestran en ambas pruebas (candidatos y agentes) en el ejercicio de "Análisis de Garantía". Sube una foto real por vehículo — se ajusta automáticamente de tamaño antes de guardarse.</div>
+      <div class="val-upload-grid">
+        <div class="upload-card">
+          <label>Carro A (buen estado, bajo kilometraje)</label>
+          <div class="preview" id="previewA">Sin foto configurada — se usa la ilustración</div>
+          <input type="file" id="fileA" accept="image/*">
+        </div>
+        <div class="upload-card">
+          <label>Carro B (mayor kilometraje, con desgaste)</label>
+          <div class="preview" id="previewB">Sin foto configurada — se usa la ilustración</div>
+          <input type="file" id="fileB">
+        </div>
+      </div>
+      <button class="btn" onclick="saveImages()">Guardar fotos</button>
+    </div>
+
+    <div class="panel">
+      <h2>🗂 Banco de preguntas</h2>
+      <div class="desc">Prende o apaga preguntas, y usa las flechas para reordenar preguntas y sus 4 opciones. Los cambios no se aplican hasta que le des a "Guardar cambios".</div>
+      <div class="tabs">
+        <div class="tab qtab active" data-t="candidato" onclick="setQTab('candidato')">Candidatos</div>
+        <div class="tab qtab" data-t="agente" onclick="setQTab('agente')">Agentes</div>
+      </div>
+
+      <div class="qsection-label">✅ Activas en la prueba (en este orden)</div>
+      <div id="activeQList"></div>
+
+      <div class="qsection-label" style="margin-top:22px;">🗄 Banco disponible (inactivas — actívalas cuando quieras)</div>
+      <div id="inactiveQList"></div>
+
+      <button class="btn amber" style="margin-top:18px;" onclick="saveQuestionBankChanges()">Guardar cambios en el banco de preguntas</button>
+    </div>
+
+    <div class="panel">
+      <h2>⭐ Encuestas de clientes</h2>
+      <div class="desc">Lo que opinan los clientes sobre el trámite, la sucursal y quién los atendió. Comparte el link de la encuesta: <span class="share-url" style="display:inline;">encuesta-clientes.html</span></div>
+      <div id="surveySummary"></div>
+      <div class="qsection-label" style="margin-top:22px;">Comentarios de clientes</div>
+      <div id="surveyComments"></div>
+    </div>
+
+    <div class="panel">
+      <h2>📋 Resultados de las pruebas</h2>
+      <div class="desc">Los candidatos y agentes nunca ven esta información — solo se registra aquí para tu revisión.</div>
+      <div class="tabs">
+        <div class="tab active" data-t="candidato" onclick="setTab('candidato')">Candidatos</div>
+        <div class="tab" data-t="agente" onclick="setTab('agente')">Agentes</div>
+      </div>
+      <div id="tableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="detailModalTitle">Detalle</h3>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="detailModalBody"></div>
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyByMV2by3Ty9-uU4IULWqXKaIzO-HBQxL80ddHdINTeX8B595gE0SszFlDKpqFYxLO8g/exec";
+
+// URLs donde tienes publicadas las dos pruebas (GitHub Pages). Cámbialas si mueves los archivos.
+const BASE_URLS = {
+  candidatos: "https://criss44jc-ai.github.io/reporte-ventas/juego-decisiones-candidatos.html",
+  agentes: "https://criss44jc-ai.github.io/reporte-ventas/evaluacion-periodica-agentes.html"
+};
+let ADMIN_KEY = "";
+let allResults = [];
+let currentTab = 'candidato';
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(()=>t.style.display='none', 3200);
+}
+
+function togglePass(inputId, btn){
+  const inp = document.getElementById(inputId);
+  const showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
+}
+
+async function changeAdminKey(){
+  const newKey = document.getElementById('newKeyInput').value.trim();
+  const confirmKey = document.getElementById('newKeyConfirm').value.trim();
+  if(!newKey){ toast('Escribe una clave nueva primero.'); return; }
+  if(newKey !== confirmKey){ toast('Las dos claves no coinciden.'); return; }
+  if(newKey.length < 4){ toast('Usa una clave de al menos 4 caracteres.'); return; }
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action:'changeAdminKey', key: ADMIN_KEY, newKey })
+    });
+    const data = await res.json();
+    if(data.error){ toast('No se pudo cambiar la clave: ' + data.error); return; }
+    ADMIN_KEY = newKey;
+    document.getElementById('newKeyInput').value = '';
+    document.getElementById('newKeyConfirm').value = '';
+    toast('Clave actualizada. Úsala la próxima vez que entres al panel.');
+  }catch(e){
+    toast('No se pudo conectar para cambiar la clave.');
+  }
+}
+
+async function login(){
+  if(!APPS_SCRIPT_URL){
+    document.getElementById('loginErr').textContent = 'Falta configurar APPS_SCRIPT_URL en este archivo (línea del script).';
+    document.getElementById('loginErr').style.display = 'block';
+    return;
+  }
+  ADMIN_KEY = document.getElementById('keyInput').value.trim();
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getResults&key=${encodeURIComponent(ADMIN_KEY)}`);
+    const data = await res.json();
+    if(data.error){
+      document.getElementById('loginErr').style.display = 'block';
+      return;
+    }
+    allResults = data;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'block';
+    renderTable();
+    loadCurrentImages();
+    loadQuestionBank();
+    loadSurveys();
+  }catch(e){
+    document.getElementById('loginErr').style.display = 'block';
+  }
+}
+
+function setTab(t){
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active', el.dataset.t===t));
+  renderTable();
+}
+
+function renderTable(){
+  const rows = allResults.filter(r => (r['Prueba']||'').toLowerCase() === currentTab);
+  const wrap = document.getElementById('tableWrap');
+  if(!rows.length){
+    wrap.innerHTML = `<div class="empty">Todavía no hay resultados de ${currentTab === 'candidato' ? 'candidatos' : 'agentes'}.</div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th><th>Nombre</th><th>Sucursal</th><th>Puntaje</th><th>Veredicto</th><th>Área a reforzar</th><th>Ética</th><th>Tiempo resp.</th><th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r,i) => `
+          <tr>
+            <td>${formatDate(r['Fecha'])}</td>
+            <td><b>${r['Nombre']||''}</b></td>
+            <td>${r['Sucursal']||''}</td>
+            <td class="score">${r['Puntaje']!==''?r['Puntaje']+'/100':'—'}</td>
+            <td>${r['Veredicto']||''}</td>
+            <td>${r['Área a reforzar']||''}</td>
+            <td>${r['Alerta ética']==='SÍ' ? '<span class="badge-flag">SÍ</span>' : '<span class="badge-ok">NO</span>'}</td>
+            <td>${r['Tiempo respuesta prom (s)']!==''? r['Tiempo respuesta prom (s)']+'s' : '—'}</td>
+            <td><button class="detail-btn" onclick="openDetail('${currentTab}', ${rows.indexOf(r)})">Ver respuestas</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  window._currentRows = rows;
+}
+
+function openDetail(tab, i){
+  const r = window._currentRows[i];
+  let answers = [];
+  try{ answers = JSON.parse(r['Respuestas detalladas'] || '[]'); }catch(e){}
+  let categorias = {};
+  try{ categorias = JSON.parse(r['Detalle categorías'] || '{}'); }catch(e){}
+  const modal = document.getElementById('detailModal');
+  const body = document.getElementById('detailModalBody');
+  document.getElementById('detailModalTitle').textContent = `${r['Nombre']||'Sin nombre'} — ${r['Sucursal']||''}`;
+
+  const summary = `
+    <div class="eval-summary">
+      <div class="eval-score">${r['Puntaje']!==''?r['Puntaje']:'—'}<span>/100</span></div>
+      <div class="eval-meta">
+        <div class="eval-verdict">${r['Veredicto']||'Sin veredicto'}</div>
+        <div class="eval-sub">Área a reforzar: <b>${r['Área a reforzar']||'—'}</b> ${r['Alerta ética']==='SÍ' ? '· <span class="badge-flag">Alerta ética</span>' : ''} ${r['Tiempo respuesta prom (s)']!==''?('· Tiempo prom: '+r['Tiempo respuesta prom (s)']+'s'):''}</div>
+      </div>
+    </div>
+    ${Object.keys(categorias).length ? `
+      <div class="eval-cats">
+        ${Object.entries(categorias).map(([k,v])=>`
+          <div class="eval-cat-row">
+            <span class="eval-cat-name">${k}</span>
+            <div class="eval-cat-bar"><div class="eval-cat-fill" style="width:${v}%;"></div></div>
+            <span class="eval-cat-val">${v}%</span>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+  `;
+
+  let answersHtml;
+  if(!answers.length){
+    answersHtml = `<div class="empty">No hay respuestas detalladas guardadas para este registro (pruebas completadas antes de activar esta función).</div>`;
+  } else {
+    answersHtml = answers.map((a,idx) => `
+      <div class="detail-item detail-${a.resultado}">
+        <div class="detail-q">${idx+1}. ${a.pregunta}</div>
+        <div class="detail-a">Respondió: <b>${a.respuesta}</b></div>
+        <div class="detail-fb">${a.explicacion||''}</div>
+      </div>
+    `).join('');
+  }
+  body.innerHTML = summary + answersHtml;
+  modal.style.display = 'flex';
+}
+function closeDetail(){ document.getElementById('detailModal').style.display = 'none'; }
+
+function formatDate(v){
+  if(!v) return '—';
+  try{
+    const d = new Date(v);
+    return d.toLocaleDateString('es-PA', {day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString('es-PA',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return v; }
+}
+
+const MAX_DATAURL_CHARS = 40000; // margen seguro bajo el límite de ~50,000 caracteres por celda de Google Sheets
+
+function resizeImage(file, maxWidth=480, quality=0.7){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = maxWidth;
+        let q = quality;
+        const render = () => {
+          const scale = Math.min(1, w/img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width*scale);
+          canvas.height = Math.round(img.height*scale);
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+          return canvas.toDataURL('image/jpeg', q);
+        };
+        let dataUrl = render();
+        // Si sigue siendo muy grande, se reduce calidad y tamaño en pasos hasta que quepa
+        let attempts = 0;
+        while(dataUrl.length > MAX_DATAURL_CHARS && attempts < 8){
+          if(q > 0.35) q -= 0.12; else w = Math.round(w * 0.85);
+          dataUrl = render();
+          attempts++;
+        }
+        if(dataUrl.length > MAX_DATAURL_CHARS){
+          reject(new Error('La imagen sigue siendo muy grande incluso después de comprimirla.'));
+          return;
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadCurrentImages(){
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getImages`);
+    const data = await res.json();
+    if(data.carroA) document.getElementById('previewA').innerHTML = `<img src="${data.carroA}">`;
+    if(data.carroB) document.getElementById('previewB').innerHTML = `<img src="${data.carroB}">`;
+  }catch(e){}
+}
+
+async function saveImages(){
+  const fileA = document.getElementById('fileA').files[0];
+  const fileB = document.getElementById('fileB').files[0];
+  if(!fileA && !fileB){ toast('Selecciona al menos una foto para guardar.'); return; }
+  const payload = { action:'setImages', key: ADMIN_KEY };
+  try{
+    if(fileA){
+      payload.carroA = await resizeImage(fileA);
+      document.getElementById('previewA').innerHTML = `<img src="${payload.carroA}">`;
+    }
+    if(fileB){
+      payload.carroB = await resizeImage(fileB);
+      document.getElementById('previewB').innerHTML = `<img src="${payload.carroB}">`;
+    }
+  }catch(e){
+    toast('No se pudo procesar la imagen: ' + e.message);
+    return;
+  }
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(()=>null);
+    if(!data || data.error){
+      toast('El servidor rechazó la foto: ' + (data && data.error ? data.error : 'respuesta inválida') + '.');
+      return;
+    }
+    toast('Fotos guardadas. Los candidatos y agentes las verán la próxima vez que abran la prueba.');
+  }catch(e){
+    toast('No se pudo conectar con Apps Script. Revisa la URL y tu conexión a internet.');
+  }
+}
+
+/* ======================= BANCO DE PREGUNTAS ======================= */
+let questionBank = [];
+let currentQTab = 'candidato';
+const CATEGORY_LABELS = {
+  cierre:'Cierre', objeciones:'Objeciones', etica:'Ética', resultados:'Resultados',
+  prospeccion:'Prospección', servicio:'Servicio', equipo:'Equipo', garantia:'Garantía'
+};
+
+async function loadQuestionBank(){
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getQuestionBank&key=${encodeURIComponent(ADMIN_KEY)}`);
+    const data = await res.json();
+    if(Array.isArray(data)){
+      questionBank = data.map(q => ({...q, activo: String(q.activo).toUpperCase()==='TRUE', orden: Number(q.orden)}));
+      renderQuestionBank();
+    }
+  }catch(e){ toast('No se pudo cargar el banco de preguntas.'); }
+}
+
+function setQTab(t){
+  currentQTab = t;
+  document.querySelectorAll('.qtab').forEach(el=>el.classList.toggle('active', el.dataset.t===t));
+  renderQuestionBank();
+}
+
+function questionsForTab(){
+  return questionBank.filter(q => q.prueba === currentQTab);
+}
+
+function renderQuestionBank(){
+  const qs = questionsForTab();
+  const active = qs.filter(q=>q.activo).sort((a,b)=>a.orden-b.orden);
+  const inactive = qs.filter(q=>!q.activo);
+
+  const activeEl = document.getElementById('activeQList');
+  activeEl.innerHTML = active.length ? active.map((q,i) => qCardHTML(q, i, active.length, true)).join('') :
+    `<div class="empty">No hay preguntas activas para ${currentQTab === 'candidato'?'candidatos':'agentes'}.</div>`;
+
+  const inactiveEl = document.getElementById('inactiveQList');
+  inactiveEl.innerHTML = inactive.length ? inactive.map((q) => qCardHTML(q, -1, -1, false)).join('') :
+    `<div class="empty">No hay preguntas de reserva sin usar.</div>`;
+}
+
+function qCardHTML(q, idx, total, isActive){
+  const optLetters = (q.ordenOpciones||'A,B,C,D').split(',').map(s=>s.trim());
+  const opts = optLetters.map(L => ({
+    letra: L, texto: q[L+'_texto'], fb: q[L+'_fb']
+  }));
+  return `
+    <div class="qcard ${isActive?'':'inactive'}">
+      <div class="qcard-head" onclick="toggleQOpen(this)">
+        <span class="qcard-cat">${CATEGORY_LABELS[q.categoria]||q.categoria}</span>
+        <span class="qcard-text">${escapeHtml(q.texto).slice(0,110)}${q.texto.length>110?'…':''}</span>
+        ${isActive ? `
+          <div class="qcard-arrows">
+            <button onclick="event.stopPropagation();moveQuestion('${q.id}',-1)" ${idx===0?'disabled':''}>▲</button>
+            <button onclick="event.stopPropagation();moveQuestion('${q.id}',1)" ${idx===total-1?'disabled':''}>▼</button>
+          </div>` : ''}
+        <button class="qcard-toggle ${q.activo?'on':''}" onclick="event.stopPropagation();toggleActive('${q.id}')"><span class="dot"></span></button>
+        <span class="qcard-chevron">▾</span>
+      </div>
+      <div class="qcard-opts">
+        ${opts.map((o,oi) => `
+          <div class="opt-row">
+            <span class="opt-letter">${String.fromCharCode(65+oi)}</span>
+            <span class="opt-text">${escapeHtml(o.texto)}</span>
+            <span class="opt-fb ${o.fb}">${o.fb}</span>
+            <div class="opt-arrows">
+              <button onclick="moveOption('${q.id}',${oi},-1)" ${oi===0?'disabled':''}>▲</button>
+              <button onclick="moveOption('${q.id}',${oi},1)" ${oi===3?'disabled':''}>▼</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+function toggleQOpen(headEl){
+  const opts = headEl.nextElementSibling;
+  opts.classList.toggle('open');
+}
+
+function findQ(id){ return questionBank.find(q=>q.id===id); }
+
+function toggleActive(id){
+  const q = findQ(id);
+  q.activo = !q.activo;
+  if(q.activo){
+    const maxOrden = Math.max(0, ...questionsForTab().filter(x=>x.activo && x.id!==id).map(x=>x.orden));
+    q.orden = maxOrden + 1;
+  }
+  renderQuestionBank();
+}
+
+function moveQuestion(id, dir){
+  const active = questionsForTab().filter(q=>q.activo).sort((a,b)=>a.orden-b.orden);
+  const i = active.findIndex(q=>q.id===id);
+  const j = i + dir;
+  if(j<0 || j>=active.length) return;
+  const tmp = active[i].orden;
+  active[i].orden = active[j].orden;
+  active[j].orden = tmp;
+  renderQuestionBank();
+}
+
+function moveOption(id, i, dir){
+  const q = findQ(id);
+  const letters = (q.ordenOpciones||'A,B,C,D').split(',').map(s=>s.trim());
+  const j = i + dir;
+  if(j<0 || j>=letters.length) return;
+  const tmp = letters[i];
+  letters[i] = letters[j];
+  letters[j] = tmp;
+  q.ordenOpciones = letters.join(',');
+  renderQuestionBank();
+}
+
+async function saveQuestionBankChanges(){
+  const updates = questionBank.map(q => ({
+    id: q.id, activo: q.activo, orden: q.orden, ordenOpciones: q.ordenOpciones
+  }));
+  try{
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action:'saveQuestionBank', key: ADMIN_KEY, updates })
+    });
+    toast('Banco de preguntas actualizado. Los cambios aplican en la próxima prueba que se abra.');
+  }catch(e){
+    toast('No se pudieron guardar los cambios. Revisa tu conexión.');
+  }
+}
+
+/* ======================= COMPARTIR / QR ======================= */
+function setShareTab(t){
+  document.querySelectorAll('.share-tab').forEach(el=>el.classList.toggle('active', el.dataset.t===t));
+  document.getElementById('shareDirecto').style.display = t==='directo' ? 'block' : 'none';
+  document.getElementById('shareSucursal').style.display = t==='sucursal' ? 'block' : 'none';
+}
+
+function buildShareUrl(testType, params){
+  const base = BASE_URLS[testType];
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k,v])=>{ if(v) qs.set(k, v); });
+  const query = qs.toString();
+  return base + (query ? ('?' + query) : '');
+}
+
+function shareCardHTML(qrId, label, url){
+  return `
+    <div class="share-card">
+      <div class="share-qr" id="${qrId}"></div>
+      <div class="share-info">
+        <div class="share-label">${label}</div>
+        <div class="share-url">${url}</div>
+        <button class="copy-btn" onclick="copyShareUrl(this,'${url.replace(/'/g,"\\'")}')">Copiar enlace</button>
+      </div>
+    </div>
+  `;
+}
+
+function copyShareUrl(btn, url){
+  navigator.clipboard.writeText(url).then(()=>{
+    const original = btn.textContent;
+    btn.textContent = '¡Copiado!';
+    setTimeout(()=>btn.textContent = original, 1800);
+  }).catch(()=>{ toast('No se pudo copiar. Selecciona y copia el enlace manualmente.'); });
+}
+
+function generateDirectLink(){
+  const testType = document.getElementById('shareTestType').value;
+  const name = document.getElementById('shareName').value.trim();
+  const branch = document.getElementById('shareBranch').value.trim();
+  const variant = document.getElementById('shareVariant').value;
+  if(!name){ toast('Escribe el nombre de la persona.'); return; }
+
+  const url = buildShareUrl(testType, { nombre:name, sucursal:branch, v:variant });
+  const qrId = 'qr_direct_' + Date.now();
+  document.getElementById('directResult').innerHTML = shareCardHTML(qrId, `${name}${branch?' — '+branch:''} (Variante ${variant})`, url);
+  new QRCode(document.getElementById(qrId), { text: url, width: 130, height: 130 });
+}
+
+function generateBranchLinks(){
+  const testType = document.getElementById('shareTestType2').value;
+  const branch = document.getElementById('shareBranch2').value.trim();
+  const variants = ['A','B','C'];
+  const wrap = document.getElementById('branchResult');
+  wrap.innerHTML = variants.map(v => {
+    const url = buildShareUrl(testType, { sucursal:branch, v });
+    const qrId = 'qr_branch_' + v + '_' + Date.now();
+    return shareCardHTML(qrId, `Variante ${v}${branch?' — '+branch:''}`, url);
+  }).join('');
+  // Generar los QR después de insertar el HTML (necesitan el elemento ya en el DOM)
+  const cards = wrap.querySelectorAll('.share-qr');
+  variants.forEach((v, i) => {
+    const url = buildShareUrl(testType, { sucursal:branch, v });
+    new QRCode(cards[i], { text: url, width: 130, height: 130 });
+  });
+}
+
+/* ======================= ENCUESTAS DE CLIENTES ======================= */
+const SURVEY_CATS = [
+  {key:'Rapidez', label:'Rapidez general del trámite'},
+  {key:'Atención', label:'Atención y amabilidad'},
+  {key:'Respuesta', label:'Rapidez de respuesta (WhatsApp/llamadas)'},
+  {key:'Claridad', label:'Claridad al explicar condiciones'},
+  {key:'Papeleo', label:'Facilidad del papeleo'},
+  {key:'Cumplimiento', label:'Cumplimiento de lo prometido'},
+  {key:'Recomienda sucursal', label:'Probabilidad de recomendar la sucursal'},
+  {key:'Recomienda financiera', label:'Probabilidad de recomendar Autocash'},
+];
+
+let surveyData = [];
+
+async function loadSurveys(){
+  const summaryEl = document.getElementById('surveySummary');
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getSurveys&key=${encodeURIComponent(ADMIN_KEY)}`);
+    const data = await res.json();
+    if(Array.isArray(data)){
+      surveyData = data;
+      renderSurveySummary();
+    } else {
+      summaryEl.innerHTML = `<div class="empty">No se pudieron cargar las encuestas: ${(data && data.error) ? data.error : 'respuesta inesperada del servidor'}.</div>`;
+    }
+  }catch(e){
+    summaryEl.innerHTML = `<div class="empty">Error de conexión al cargar las encuestas: ${e.message}</div>`;
+  }
+}
+
+function starsDisplay(avg){
+  const rounded = Math.round(avg);
+  return '★'.repeat(Math.max(0,Math.min(5,rounded))) + '☆'.repeat(5-Math.max(0,Math.min(5,rounded)));
+}
+
+function renderSurveySummary(){
+  const summaryEl = document.getElementById('surveySummary');
+  const commentsEl = document.getElementById('surveyComments');
+  if(!surveyData.length){
+    summaryEl.innerHTML = `<div class="empty">Todavía no hay respuestas de clientes.</div>`;
+    commentsEl.innerHTML = '';
+    return;
+  }
+
+  const overallAvg = surveyData.reduce((a,r)=>a+(Number(r['Promedio'])||0),0) / surveyData.length;
+
+  const catAverages = SURVEY_CATS.map(c => {
+    const vals = surveyData.map(r=>Number(r[c.key])||0).filter(v=>v>0);
+    const avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    return { ...c, avg };
+  });
+
+  const vendorMap = {};
+  surveyData.forEach(r => {
+    const v = r['Vendedor'] || 'No especificado';
+    if(!vendorMap[v]) vendorMap[v] = { total:0, count:0 };
+    vendorMap[v].total += Number(r['Promedio'])||0;
+    vendorMap[v].count += 1;
+  });
+  const vendorRanking = Object.entries(vendorMap)
+    .map(([name, d]) => ({ name, avg: d.total/d.count, count: d.count }))
+    .sort((a,b) => b.avg - a.avg);
+
+  summaryEl.innerHTML = `
+    <div class="survey-overall">
+      <div class="big">${overallAvg.toFixed(1)}</div>
+      <div>
+        <div class="stars-display">${starsDisplay(overallAvg)}</div>
+        <div class="count">${surveyData.length} respuesta${surveyData.length!==1?'s':''} en total</div>
+      </div>
+    </div>
+    <div class="qsection-label">Promedio por ámbito</div>
+    ${catAverages.map(c => `
+      <div class="survey-cat-row">
+        <span class="survey-cat-name">${c.label}</span>
+        <div class="survey-cat-bar"><div class="survey-cat-fill" style="width:${(c.avg/5)*100}%;"></div></div>
+        <span class="survey-cat-val">${c.avg.toFixed(1)}</span>
+      </div>
+    `).join('')}
+    <div class="qsection-label" style="margin-top:18px;">Ranking de vendedores</div>
+    ${vendorRanking.map(v => `
+      <div class="vendor-rank">
+        <span class="name">${v.name}</span>
+        <span class="stars-display">${starsDisplay(v.avg)}</span>
+        <span>${v.avg.toFixed(1)} (${v.count} reseña${v.count!==1?'s':''})</span>
+      </div>
+    `).join('')}
+  `;
+
+  const withComments = surveyData.filter(r => r['Comentario'] && String(r['Comentario']).trim());
+  commentsEl.innerHTML = withComments.length ? withComments.map(r => `
+    <div class="comment-card">
+      <div class="comment-meta">${r['Cliente']||'Cliente sin nombre'} · ${r['Sucursal']||''} · ${r['Vendedor']||''} · ${formatDate(r['Fecha'])}</div>
+      "${r['Comentario']}"
+    </div>
+  `).join('') : `<div class="empty">Sin comentarios todavía.</div>`;
+}
+</script>
+</body>
+</html>
