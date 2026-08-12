@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tu opinión — Financiera Autocash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14213D; --asphalt:#3A3F44; --paper:#FBF1EF; --paper2:#F3E4E1;
+    --coral:#E4604F; --coral-dark:#C24736; --green:#3FA34D; --line:#E8D8D4; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--paper);
+    background-image:repeating-linear-gradient(90deg, transparent 0 78px, rgba(20,33,61,0.03) 78px 80px);
+    color:var(--ink);font-family:'Inter',sans-serif;min-height:100vh;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:28px 20px 60px;}
+  .brand{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:6px;}
+  .brand h1{font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.14em;text-transform:uppercase;margin:0;color:var(--asphalt);}
+  .brand .tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--coral-dark);background:#FBE3DF;padding:3px 8px;border-radius:3px;}
+
+  .card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:30px 28px;box-shadow:0 2px 0 var(--line);}
+  .cat-label{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--coral-dark);margin-bottom:10px;}
+  h2{font-family:'Oswald',sans-serif;font-size:28px;margin:0 0 10px;line-height:1.15;}
+  .intro p{font-size:15.5px;color:var(--asphalt);line-height:1.6;margin-bottom:22px;}
+
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--asphalt);margin-bottom:6px;}
+  .field input, .field select, .field textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:6px;font-family:'Inter';font-size:15px;background:var(--paper);box-sizing:border-box;}
+  .field textarea{resize:vertical;min-height:80px;font-family:'Inter';}
+  .field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--coral);border-color:var(--coral);}
+
+  .rating-row{padding:16px 0;border-bottom:1px solid var(--paper2);}
+  .rating-row:last-of-type{border-bottom:none;}
+  .rating-label{font-size:14.5px;font-weight:600;margin-bottom:9px;color:var(--ink);}
+  .stars{display:flex;gap:6px;}
+  .star{font-size:32px;line-height:1;cursor:pointer;color:var(--line);background:none;border:none;padding:0;transition:transform .1s;}
+  .star:hover{transform:scale(1.12);}
+  .star.filled{color:#F4A11B;}
+
+  .submit-btn{margin-top:24px;width:100%;background:var(--coral);color:var(--white);border:none;border-radius:6px;padding:15px;font-family:'Oswald',sans-serif;font-size:15px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;cursor:pointer;}
+  .submit-btn:hover{background:var(--coral-dark);}
+  .submit-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .err-note{color:var(--coral-dark);font-size:13px;margin-top:10px;display:none;}
+
+  .thanks h2{margin-bottom:6px;}
+  .thanks p{color:var(--asphalt);font-size:15px;line-height:1.6;}
+  .thanks .big-check{font-size:52px;margin-bottom:8px;}
+
+  @keyframes balloonUp{ 0%{transform:translateY(0) rotate(0deg); opacity:1;} 100%{transform:translateY(-115vh) rotate(12deg); opacity:0;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <h1>Financiera Autocash</h1>
+    <span class="tag">Encuesta de satisfacción</span>
+  </div>
+  <div class="card" id="card"></div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzdwD4mF2VHbnpIoQ7s6WYA-VlNva2siU9uk52Z-HsPECBhMG9e0JiDfWG8YaFrw-hrlw/exec";
+const BRANCHES = ["Casa Matriz","Chorrera","La 24 de Diciembre","Chiriquí"];
+
+const RATING_ITEMS = [
+  { key:"rapidez", label:"Rapidez general del trámite" },
+  { key:"atencion", label:"Atención y amabilidad del vendedor" },
+  { key:"respuesta", label:"Rapidez de respuesta (WhatsApp / llamadas)" },
+  { key:"claridad", label:"Claridad al explicar las condiciones y la tasa" },
+  { key:"papeleo", label:"Facilidad del papeleo y los documentos pedidos" },
+  { key:"cumplimiento", label:"Cumplimiento de lo que se le prometió (monto, tasa, tiempo)" },
+  { key:"recomienda_sucursal", label:"Qué tan probable es que recomiende esta sucursal" },
+  { key:"recomienda_financiera", label:"¿Recomendarías Financiera Autocash en general?" },
+];
+
+let ratings = {};
+const card = document.getElementById('card');
+
+function postSurvey(payload){
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+function starRowHTML(item){
+  return `
+    <div class="rating-row">
+      <div class="rating-label">${item.label}</div>
+      <div class="stars" data-key="${item.key}">
+        ${[1,2,3,4,5].map(v=>`<button type="button" class="star" data-val="${v}">★</button>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderForm(){
+  card.innerHTML = `
+    <div class="cat-label">Cuéntanos cómo fue tu experiencia</div>
+    <h2>¿Cómo fue tu trámite?</h2>
+    <div class="intro"><p>Tu opinión nos ayuda a mejorar el servicio. Toma menos de un minuto y es completamente confidencial.</p></div>
+
+    <div class="field">
+      <label>Tu nombre <span style="color:var(--coral-dark);">*</span></label>
+      <input type="text" id="inpClientName" placeholder="Nombre completo">
+    </div>
+    <div class="field">
+      <label>Sucursal donde te atendieron <span style="color:var(--coral-dark);">*</span></label>
+      <select id="inpBranch">
+        <option value="">Selecciona una sucursal</option>
+        ${BRANCHES.map(b=>`<option value="${b}">${b}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Nombre de quien te atendió</label>
+      <input type="text" id="inpVendor" placeholder="Nombre del vendedor o vendedora">
+    </div>
+
+    <div id="ratingsWrap">
+      ${RATING_ITEMS.map(starRowHTML).join('')}
+    </div>
+
+    <div class="field" style="margin-top:6px;">
+      <label>¿Algo más que quieras contarnos? (opcional)</label>
+      <textarea id="inpComment" placeholder="Cuéntanos cualquier detalle, bueno o malo..."></textarea>
+    </div>
+
+    <button class="submit-btn" id="submitBtn">Enviar mi opinión</button>
+    <div class="err-note" id="errNote">Por favor escribe tu nombre, selecciona tu sucursal y califica los 8 puntos antes de enviar.</div>
+  `;
+
+  document.querySelectorAll('.stars').forEach(group => {
+    const key = group.dataset.key;
+    group.querySelectorAll('.star').forEach(btn => {
+      btn.onclick = () => {
+        const val = parseInt(btn.dataset.val);
+        ratings[key] = val;
+        group.querySelectorAll('.star').forEach(s => {
+          s.classList.toggle('filled', parseInt(s.dataset.val) <= val);
+        });
+      };
+    });
+  });
+
+  document.getElementById('submitBtn').onclick = submitSurvey;
+}
+
+function submitSurvey(){
+  const clientName = document.getElementById('inpClientName').value.trim();
+  const branch = document.getElementById('inpBranch').value;
+  const vendor = document.getElementById('inpVendor').value.trim();
+  const comment = document.getElementById('inpComment').value.trim();
+  const allRated = RATING_ITEMS.every(item => ratings[item.key] != null);
+
+  if(!clientName || !branch || !allRated){
+    document.getElementById('errNote').style.display = 'block';
+    return;
+  }
+
+  postSurvey({
+    action: 'submitSurvey',
+    cliente: clientName,
+    sucursal: branch,
+    vendedor: vendor || 'No especificado',
+    ratings: ratings,
+    comentario: comment
+  });
+
+  renderThanks(clientName);
+}
+
+function renderThanks(clientName){
+  const firstName = (clientName||'').trim().split(' ')[0];
+  card.innerHTML = `
+    <div class="thanks" style="text-align:center;">
+      <div class="big-check">💛</div>
+      <h2>¡Gracias${firstName ? ', '+firstName : ''}!</h2>
+      <p>Tu respuesta fue registrada y nos ayuda a mejorar cada día. Que tengas un excelente día.</p>
+    </div>
+  `;
+  playThanksChime();
+  launchBalloons();
+}
+
+/* ===== Sonido y globos (mismo estilo que las otras pruebas) ===== */
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playThanksChime(){
+  try{
+    const ctx = getAudioCtx();
+    [523.25, 659.25, 783.99].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.11;
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.13, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.33);
+    });
+  }catch(e){}
+}
+function launchBalloons(){
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;';
+  document.body.appendChild(container);
+  for(let i=0;i<14;i++){
+    const b = document.createElement('div');
+    b.textContent = ['💛','🎈'][Math.random()<0.6?0:1];
+    const left = Math.random()*96;
+    const delay = Math.random()*0.5;
+    const duration = 2.6 + Math.random()*1.6;
+    const size = 24 + Math.random()*20;
+    b.style.cssText = `position:absolute;left:${left}%;bottom:-60px;font-size:${size}px;animation:balloonUp ${duration}s ease-in ${delay}s forwards;`;
+    container.appendChild(b);
+  }
+  setTimeout(()=>container.remove(), 4600);
+}
+
+renderForm();
+</script>
+</body>
+</html>
