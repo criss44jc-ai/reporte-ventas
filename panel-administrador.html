@@ -93,6 +93,27 @@
   .eval-cat-fill{height:100%;background:var(--teal);border-radius:4px;}
   .eval-cat-val{font-family:'JetBrains Mono',monospace;font-size:11px;width:36px;text-align:right;}
 
+  .table-tools{display:flex;justify-content:flex-end;margin-bottom:12px;}
+  .dl-btn{font-family:'Oswald',sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.03em;padding:7px 12px;border-radius:5px;border:1.5px solid var(--ink);background:var(--white);color:var(--ink);cursor:pointer;}
+  .dl-btn:hover{background:var(--ink);color:var(--white);}
+  .modal-actions{display:flex;align-items:center;gap:8px;}
+  .print-only{display:none;}
+
+  @media print{
+    body{background:#fff !important;color:#000 !important;}
+    .wrap,.toast{display:none !important;}
+    .modal-overlay{position:static !important;display:block !important;background:none !important;padding:0 !important;}
+    .modal-box{max-height:none !important;max-width:none !important;overflow:visible !important;box-shadow:none !important;}
+    .modal-head{position:static !important;}
+    .modal-actions{display:none !important;}
+    .print-only{display:block !important;}
+    .print-header{border-bottom:2px solid #14213D;padding-bottom:8px;margin-bottom:12px;}
+    .print-header b{font-family:'Oswald',sans-serif;letter-spacing:.1em;text-transform:uppercase;}
+    .print-header span{display:block;font-size:11.5px;color:#555;margin-top:2px;}
+    .eval-cat-fill,.badge-flag,.badge-ok{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .detail-item{page-break-inside:avoid;}
+  }
+
   .share-tabs{display:flex;gap:8px;margin-bottom:18px;}
   .share-tab{padding:8px 14px;border-radius:6px;font-family:'Oswald',sans-serif;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;border:1.5px solid var(--line);background:var(--paper);color:var(--asphalt);}
   .share-tab.active{background:var(--ink);color:var(--white);border-color:var(--ink);}
@@ -294,6 +315,7 @@
         <div class="tab active" data-t="candidato" onclick="setTab('candidato')">Candidatos</div>
         <div class="tab" data-t="agente" onclick="setTab('agente')">Agentes</div>
       </div>
+      <div class="table-tools"><button class="dl-btn" onclick="downloadResultsCSV()">⬇ Descargar resultados (Excel)</button></div>
       <div id="tableWrap"></div>
     </div>
   </div>
@@ -305,14 +327,18 @@
   <div class="modal-box">
     <div class="modal-head">
       <h3 id="detailModalTitle">Detalle</h3>
-      <button class="modal-close" onclick="closeDetail()">✕</button>
+      <div class="modal-actions">
+        <button class="dl-btn" onclick="downloadDetailPDF()">⬇ PDF</button>
+        <button class="dl-btn" onclick="downloadDetailCSV()">⬇ Excel</button>
+        <button class="modal-close" onclick="closeDetail()">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="detailModalBody"></div>
   </div>
 </div>
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyByMV2by3Ty9-uU4IULWqXKaIzO-HBQxL80ddHdINTeX8B595gE0SszFlDKpqFYxLO8g/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbza5HjRZRY0MOP22ix4mnOCfyP5QtnUrh9oCh0b1l_gvPIWS83Cs2ihXUvtd6iAMbsx/exec";
 
 // URLs donde tienes publicadas las dos pruebas (GitHub Pages). Cámbialas si mueves los archivos.
 const BASE_URLS = {
@@ -428,6 +454,7 @@ function renderTable(){
 
 function openDetail(tab, i){
   const r = window._currentRows[i];
+  window._detailRow = r;
   let answers = [];
   try{ answers = JSON.parse(r['Respuestas detalladas'] || '[]'); }catch(e){}
   let categorias = {};
@@ -448,7 +475,7 @@ function openDetail(tab, i){
       <div class="eval-cats">
         ${Object.entries(categorias).map(([k,v])=>`
           <div class="eval-cat-row">
-            <span class="eval-cat-name">${k}</span>
+            <span class="eval-cat-name">${CATEGORY_LABELS[k]||k}</span>
             <div class="eval-cat-bar"><div class="eval-cat-fill" style="width:${v}%;"></div></div>
             <span class="eval-cat-val">${v}%</span>
           </div>
@@ -469,10 +496,94 @@ function openDetail(tab, i){
       </div>
     `).join('');
   }
-  body.innerHTML = summary + answersHtml;
+  const printHeader = `
+    <div class="print-only print-header">
+      <b>Financiera Autocash</b>
+      <span>Evaluación de ${String(r['Prueba']).toLowerCase()==='agente'?'agente (revisión periódica)':'candidato'} · ${r['Nombre']||'Sin nombre'} · ${r['Sucursal']||''} · ${formatDate(r['Fecha'])}</span>
+      <span>Documento confidencial — uso interno</span>
+    </div>`;
+  body.innerHTML = printHeader + summary + answersHtml;
   modal.style.display = 'flex';
 }
 function closeDetail(){ document.getElementById('detailModal').style.display = 'none'; }
+
+/* ======================= DESCARGAS ======================= */
+function csvCell(v){
+  const t = String(v==null?'':v);
+  return /[",\n;]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t;
+}
+function csvLine(arr){ return arr.map(csvCell).join(','); }
+function downloadFile(filename, content, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+function safeName(s){
+  return String(s||'sin-nombre').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase() || 'sin-nombre';
+}
+function todayStamp(){ return new Date().toISOString().slice(0,10); }
+function parseJSONSafe(t, fallback){ try{ return JSON.parse(t||''); }catch(e){ return fallback; } }
+const RESULT_LABEL = { good:'Buena decisión', mid:'Aceptable', bad:'Riesgosa' };
+
+// Todos los resultados de la pestaña activa (Candidatos o Agentes) en un solo archivo
+function downloadResultsCSV(){
+  const rows = allResults.filter(r => (r['Prueba']||'').toLowerCase() === currentTab);
+  if(!rows.length){ toast('No hay resultados para descargar en esta pestaña.'); return; }
+  const catKeys = [];
+  rows.forEach(r => Object.keys(parseJSONSafe(r['Detalle categorías'], {})).forEach(k => { if(!catKeys.includes(k)) catKeys.push(k); }));
+  const header = ['Fecha','Nombre','Sucursal','Puntaje (sobre 100)','Veredicto','Área a reforzar','Alerta ética','Tiempo resp. prom (s)']
+    .concat(catKeys.map(k => (CATEGORY_LABELS[k]||k) + ' (%)'));
+  const lines = [csvLine(header)];
+  rows.forEach(r => {
+    const cats = parseJSONSafe(r['Detalle categorías'], {});
+    lines.push(csvLine([
+      formatDate(r['Fecha']), r['Nombre'], r['Sucursal'], r['Puntaje'], r['Veredicto'],
+      r['Área a reforzar'], r['Alerta ética'], r['Tiempo respuesta prom (s)']
+    ].concat(catKeys.map(k => cats[k]!=null ? cats[k] : ''))));
+  });
+  const tipo = currentTab === 'candidato' ? 'candidatos' : 'agentes';
+  downloadFile(`resultados-${tipo}-${todayStamp()}.csv`, '\uFEFF' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+  toast('Archivo descargado. Ábrelo con Excel o Google Sheets.');
+}
+
+// Evaluación completa de una persona (resumen + categorías + cada respuesta) en Excel/CSV
+function downloadDetailCSV(){
+  const r = window._detailRow;
+  if(!r) return;
+  const cats = parseJSONSafe(r['Detalle categorías'], {});
+  const answers = parseJSONSafe(r['Respuestas detalladas'], []);
+  const lines = [
+    csvLine(['Evaluación', String(r['Prueba']).toLowerCase()==='agente' ? 'Agente (revisión periódica)' : 'Candidato']),
+    csvLine(['Nombre', r['Nombre']]),
+    csvLine(['Sucursal', r['Sucursal']]),
+    csvLine(['Fecha', formatDate(r['Fecha'])]),
+    csvLine(['Puntaje (sobre 100)', r['Puntaje']]),
+    csvLine(['Veredicto', r['Veredicto']]),
+    csvLine(['Área a reforzar', r['Área a reforzar']]),
+    csvLine(['Alerta ética', r['Alerta ética']]),
+  ];
+  if(r['Tiempo respuesta prom (s)']!=='' && r['Tiempo respuesta prom (s)']!=null) lines.push(csvLine(['Tiempo de respuesta promedio (s)', r['Tiempo respuesta prom (s)']]));
+  lines.push('', csvLine(['Categoría','Puntaje (%)']));
+  Object.entries(cats).forEach(([k,v]) => lines.push(csvLine([CATEGORY_LABELS[k]||k, v])));
+  lines.push('', csvLine(['#','Pregunta','Respuesta elegida','Resultado','Explicación']));
+  answers.forEach((a,i) => lines.push(csvLine([i+1, a.pregunta, a.respuesta, RESULT_LABEL[a.resultado]||a.resultado, a.explicacion||''])));
+  downloadFile(`evaluacion-${safeName(r['Nombre'])}-${todayStamp()}.csv`, '\uFEFF' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+  toast('Evaluación descargada.');
+}
+
+// PDF: abre el cuadro de impresión solo con la evaluación; elige "Guardar como PDF"
+function downloadDetailPDF(){
+  const r = window._detailRow;
+  if(!r) return;
+  const originalTitle = document.title;
+  document.title = `Evaluacion-${safeName(r['Nombre'])}-${todayStamp()}`;
+  const restore = () => { document.title = originalTitle; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  window.print();
+}
 
 function formatDate(v){
   if(!v) return '—';
